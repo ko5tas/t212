@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T212 Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>T212 Dashboard</h1>
+    <span id="status" class="status disconnected">Connecting…</span>
+    <span id="updated"></span>
+  </header>
+  <main>
+    <p id="empty" class="empty hidden">No positions with profit &gt; £1/share</p>
+    <table id="positions" class="hidden">
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Quantity</th>
+          <th>Avg Price</th>
+          <th>Current Price</th>
+          <th>Profit/Share</th>
+          <th>Market Value</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

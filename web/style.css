@@ -1,0 +1,15 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1.5rem; }
+header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+h1 { font-size: 1.25rem; font-weight: 600; }
+.status { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 500; }
+.status.connected { background: #14532d; color: #4ade80; }
+.status.disconnected { background: #450a0a; color: #f87171; }
+#updated { font-size: 0.75rem; color: #94a3b8; margin-left: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th { text-align: left; padding: 0.6rem 1rem; background: #1e293b; color: #94a3b8; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 0.75rem 1rem; border-bottom: 1px solid #1e293b; }
+tr:hover td { background: #1e293b; }
+.profit { color: #4ade80; font-weight: 600; }
+.hidden { display: none; }
+.empty { color: #94a3b8; font-style: italic; }
