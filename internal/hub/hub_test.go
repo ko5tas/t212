@@ -57,6 +57,20 @@ func TestHub_Unsubscribe(t *testing.T) {
 	}
 }
 
+func TestHub_DoubleUnsubscribe(t *testing.T) {
+	h := hub.New()
+	_, unsub := h.Subscribe()
+
+	// Second call must not panic.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("double unsubscribe panicked: %v", r)
+		}
+	}()
+	unsub()
+	unsub() // should be a no-op, not a panic
+}
+
 func TestHub_MultipleSubscribers(t *testing.T) {
 	h := hub.New()
 	const n = 5
