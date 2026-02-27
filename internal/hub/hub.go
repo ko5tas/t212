@@ -21,11 +21,14 @@ func (h *Hub) Subscribe() (<-chan []byte, func()) {
 	h.clients[ch] = struct{}{}
 	h.mu.Unlock()
 
+	var once sync.Once
 	return ch, func() {
-		h.mu.Lock()
-		delete(h.clients, ch)
-		h.mu.Unlock()
-		close(ch)
+		once.Do(func() {
+			h.mu.Lock()
+			delete(h.clients, ch)
+			h.mu.Unlock()
+			close(ch)
+		})
 	}
 }
 

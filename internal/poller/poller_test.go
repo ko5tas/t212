@@ -38,19 +38,24 @@ func TestPoller_PollsAndStores(t *testing.T) {
 	h := hub.New()
 	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, nil)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go p.Run(ctx)
-	time.Sleep(150 * time.Millisecond)
 
-	got := s.Get()
-	if len(got) == 0 {
-		t.Fatal("store should have positions after poller ran")
+	// Wait up to 2 seconds for the store to be populated.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		got := s.Get()
+		if len(got) > 0 {
+			if got[0].Ticker != "AAPL_US_EQ" {
+				t.Errorf("unexpected ticker: %q", got[0].Ticker)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	if got[0].Ticker != "AAPL_US_EQ" {
-		t.Errorf("unexpected ticker: %q", got[0].Ticker)
-	}
+	t.Fatal("store was not populated within 2 seconds")
 }
 
 func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
@@ -68,7 +73,7 @@ func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
 	defer unsub()
 
 	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, nil)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	go p.Run(ctx)
@@ -87,7 +92,7 @@ func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
 		if payload.Positions[0].Ticker != "AAPL_US_EQ" {
 			t.Errorf("expected AAPL, got %q", payload.Positions[0].Ticker)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for broadcast")
 	}
 }
