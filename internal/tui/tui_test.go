@@ -63,6 +63,17 @@ func TestModel_EmptyPositions(t *testing.T) {
 	}
 }
 
+func TestModel_NullPositionsInJSON(t *testing.T) {
+	m := tui.NewModel()
+	updated := m.ApplyMessage([]byte(`{"timestamp":"2026-02-27T00:00:00Z","positions":null}`))
+	if updated.Positions() == nil {
+		t.Error("positions should be empty slice, not nil when JSON has null")
+	}
+	if len(updated.Positions()) != 0 {
+		t.Errorf("expected 0 positions, got %d", len(updated.Positions()))
+	}
+}
+
 func TestModel_TimestampUpdated(t *testing.T) {
 	m := tui.NewModel()
 	ts := time.Date(2026, 2, 27, 12, 34, 56, 0, time.UTC)

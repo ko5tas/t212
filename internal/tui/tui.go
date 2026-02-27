@@ -136,6 +136,10 @@ func Run(ctx context.Context, wsURL string) error {
 		for {
 			_, raw, err := conn.ReadMessage()
 			if err != nil {
+				// Normal closure (user quit) — don't log as error.
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					return
+				}
 				slog.Error("ws read error", "err", err)
 				p.Send(errMsg(err))
 				return
