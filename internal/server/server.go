@@ -61,10 +61,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
-	if s.activeConns.Load() >= maxConnections {
+	if s.activeConns.Add(1) > maxConnections {
+		s.activeConns.Add(-1)
 		http.Error(w, "too many connections", http.StatusServiceUnavailable)
 		return
 	}
+	defer s.activeConns.Add(-1)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -72,9 +74,6 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
-
-	s.activeConns.Add(1)
-	defer s.activeConns.Add(-1)
 
 	ch, unsub := s.hub.Subscribe()
 	defer unsub()

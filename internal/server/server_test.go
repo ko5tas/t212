@@ -40,8 +40,10 @@ func TestServer_SecureHeaders(t *testing.T) {
 	}
 
 	checks := map[string]string{
-		"X-Frame-Options":        "DENY",
-		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":         "DENY",
+		"X-Content-Type-Options":  "nosniff",
+		"Referrer-Policy":         "no-referrer",
+		"Content-Security-Policy": "default-src 'self'",
 	}
 	for header, want := range checks {
 		if got := resp.Header.Get(header); got != want {
