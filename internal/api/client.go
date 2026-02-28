@@ -60,10 +60,15 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 		return nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	// The T212 API wire format nests the ticker inside an "instrument" object
-	// and uses "averagePricePaid" for the average price field.
+	// The T212 API wire format nests the ticker and currencyCode inside an
+	// "instrument" object and uses "averagePricePaid" for the average price.
+	// UK instruments have currencyCode "GBX" (pence); prices are divided by 100
+	// to normalise to GBP before storing.
 	type wirePosition struct {
-		Instrument   struct{ Ticker string `json:"ticker"` } `json:"instrument"`
+		Instrument struct {
+			Ticker       string `json:"ticker"`
+			CurrencyCode string `json:"currencyCode"`
+		} `json:"instrument"`
 		Quantity     float64 `json:"quantity"`
 		AveragePrice float64 `json:"averagePricePaid"`
 		CurrentPrice float64 `json:"currentPrice"`
@@ -75,11 +80,17 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 
 	positions := make([]Position, len(raw))
 	for i, r := range raw {
+		avg := r.AveragePrice
+		curr := r.CurrentPrice
+		if r.Instrument.CurrencyCode == "GBX" {
+			avg /= 100
+			curr /= 100
+		}
 		positions[i] = Position{
 			Ticker:       r.Instrument.Ticker,
 			Quantity:     r.Quantity,
-			AveragePrice: r.AveragePrice,
-			CurrentPrice: r.CurrentPrice,
+			AveragePrice: avg,
+			CurrentPrice: curr,
 		}
 		positions[i].Compute()
 	}

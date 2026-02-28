@@ -75,3 +75,49 @@ func TestClient_FetchPositions_Non200(t *testing.T) {
 		t.Fatal("expected error for 401, got nil")
 	}
 }
+
+func TestClient_FetchPositions_GBXConversion(t *testing.T) {
+	// UK-exchange instruments are returned by the T212 API with currencyCode "GBX"
+	// (pence sterling). Prices must be divided by 100 to obtain GBP values.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("x-ratelimit-remaining", "59")
+		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
+		json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"instrument":       map[string]any{"ticker": "LLOY_EQ", "currencyCode": "GBX"},
+				"quantity":         1000.0,
+				"averagePricePaid": 5500.0, // 5500 GBX = £55.00
+				"currentPrice":     5612.0, // 5612 GBX = £56.12
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("test-key", "test-secret", srv.URL, srv.Client())
+	positions, _, err := c.FetchPositions(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(positions) != 1 {
+		t.Fatalf("expected 1 position, got %d", len(positions))
+	}
+	p := positions[0]
+	if p.Ticker != "LLOY_EQ" {
+		t.Errorf("ticker: got %q, want LLOY_EQ", p.Ticker)
+	}
+	// Prices must be divided by 100: GBX → GBP
+	if p.AveragePrice != 55.00 {
+		t.Errorf("AveragePrice: got %v, want 55.00 (5500 GBX ÷ 100)", p.AveragePrice)
+	}
+	if p.CurrentPrice != 56.12 {
+		t.Errorf("CurrentPrice: got %v, want 56.12 (5612 GBX ÷ 100)", p.CurrentPrice)
+	}
+	wantProfit := 56.12 - 55.00
+	if diff := p.ProfitPerShare - wantProfit; diff > 0.001 || diff < -0.001 {
+		t.Errorf("ProfitPerShare: got %v, want ~%v", p.ProfitPerShare, wantProfit)
+	}
+	wantMV := 1000.0 * 56.12
+	if diff := p.MarketValue - wantMV; diff > 0.001 || diff < -0.001 {
+		t.Errorf("MarketValue: got %v, want ~%v", p.MarketValue, wantMV)
+	}
+}
