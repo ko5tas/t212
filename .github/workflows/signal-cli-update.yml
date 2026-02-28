@@ -1,0 +1,42 @@
+name: Check signal-cli updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # every Monday 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for new signal-cli release
+        id: check
+        run: |
+          LATEST=$(curl -fsSL https://api.github.com/repos/AsamK/signal-cli/releases/latest \
+            | grep '"tag_name"' | sed 's/.*"tag_name": "\(.*\)".*/\1/')
+          CURRENT=$(cat .signal-cli-version 2>/dev/null || echo "none")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Latest: $LATEST | Current: $CURRENT"
+          if [ "$LATEST" != "$CURRENT" ]; then
+            echo "update_available=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Open PR if update available
+        if: steps.check.outputs.update_available == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST="${{ steps.check.outputs.latest }}"
+          BRANCH="chore/signal-cli-${LATEST}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          echo "$LATEST" > .signal-cli-version
+          git add .signal-cli-version
+          git commit -m "chore: update signal-cli to ${LATEST}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: update signal-cli to ${LATEST}" \
+            --body "signal-cli ${LATEST} is available. Run \`make update-signal-cli\` after merging to install on the Pi." \
+            --base main

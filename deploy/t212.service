@@ -1,0 +1,21 @@
+[Unit]
+Description=T212 Portfolio Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/t212/config.env
+ExecStart=/usr/local/bin/t212 serve
+Restart=always
+RestartSec=5
+User=t212
+Group=t212
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+ProtectHome=yes
+PrivateDevices=yes
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
