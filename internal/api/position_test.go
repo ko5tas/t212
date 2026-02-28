@@ -7,11 +7,13 @@ import (
 	"github.com/ko5tas/t212/internal/api"
 )
 
-func TestPosition_UnmarshalJSON(t *testing.T) {
+// TestPosition_UnmarshalJSON_RealAPIFields tests against the actual T212 API field names:
+// "instrument" (not "ticker") and "averagePricePaid" (not "averagePrice").
+func TestPosition_UnmarshalJSON_RealAPIFields(t *testing.T) {
 	raw := `{
-		"ticker": "AAPL_US_EQ",
+		"instrument": "AAPL_US_EQ",
 		"quantity": 3.0,
-		"averagePrice": 173.20,
+		"averagePricePaid": 173.20,
 		"currentPrice": 182.50
 	}`
 
@@ -36,7 +38,7 @@ func TestPosition_UnmarshalJSON(t *testing.T) {
 
 func TestPosition_Computed(t *testing.T) {
 	p := api.Position{
-		Ticker:       "AAPL_US_EQ",
+		Ticker:       "AAPL_US_EQ", // struct field name unchanged; only JSON tag changed
 		Quantity:     3.0,
 		AveragePrice: 173.20,
 		CurrentPrice: 182.50,
