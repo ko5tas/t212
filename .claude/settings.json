@@ -1,8 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls *)",
-      "Bash(*)"
+      "Bash(*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "additionalDirectories": [
       "/Users/kostas/.claude/projects/-Users-kostas-Dropbox-Mac--5--Documents-dev-github-com-ko5tas-t212"

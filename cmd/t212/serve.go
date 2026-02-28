@@ -41,7 +41,7 @@ func runServe() error {
 		"signal_enabled", signalNumber != "",
 	)
 
-	apiClient := api.NewClient(apiKey, "https://app.trading212.com", nil)
+	apiClient := api.NewClient(apiKey, "https://live.trading212.com", nil)
 	s := store.New()
 	h := hub.New()
 
