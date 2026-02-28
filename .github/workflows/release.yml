@@ -33,7 +33,7 @@ jobs:
       - name: Cross-compile for linux/arm64
         run: GOARCH=arm64 GOOS=linux go build -o t212-arm64 ./cmd/t212
       - name: Install nfpm
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0
       - name: Build .deb
         run: VERSION=${{ github.ref_name }} nfpm package --packager deb --target .
       - name: Create GitHub Release

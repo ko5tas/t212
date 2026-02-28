@@ -17,9 +17,9 @@ build:
 build-arm:
 	GOARCH=arm64 GOOS=linux go build -o $(BINARY_ARM) ./cmd/t212
 
-## deb: build .deb package for linux/arm64 (requires nfpm: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest)
+## deb: build .deb package for linux/arm64 (requires nfpm: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0)
 deb: build-arm
-	@command -v nfpm >/dev/null 2>&1 || { echo "nfpm not found. Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"; exit 1; }
+	@command -v nfpm >/dev/null 2>&1 || { echo "nfpm not found. Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0"; exit 1; }
 	VERSION=$(VERSION) nfpm package --packager deb --target .
 	@echo "Built: t212_$(VERSION)_arm64.deb"
 

@@ -206,7 +206,7 @@ Downloads the latest release from GitHub, verifies the SHA256 checksum, and repl
 |---|---|
 | `make build` | Compile for current platform |
 | `make build-arm` | Cross-compile for Raspberry Pi 5 (`linux/arm64`) |
-| `make deb` | Build `.deb` package for Raspberry Pi (requires `nfpm`: `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`) |
+| `make deb` | Build `.deb` package for Raspberry Pi (requires `nfpm`: `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0`) |
 | `make test` | Run all tests with race detector and coverage |
 | `make lint` | Run `golangci-lint` |
 | `make security` | Run `govulncheck` |
