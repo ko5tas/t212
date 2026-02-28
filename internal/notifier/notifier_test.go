@@ -31,7 +31,7 @@ func TestNotifier_NotifyEntered(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
 	n := notifier.New(binPath, "+447700000000")
-	n.Notify("AAPL_US_EQ", true, 9.30)
+	n.Notify("AAPL_US_EQ", true, 9.30, "$")
 
 	data, err := os.ReadFile(argsFile)
 	if err != nil {
@@ -54,7 +54,7 @@ func TestNotifier_NotifyExited(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
 	n := notifier.New(binPath, "+447700000000")
-	n.Notify("TSLA_US_EQ", false, 0)
+	n.Notify("TSLA_US_EQ", false, 0, "")
 
 	data, _ := os.ReadFile(argsFile)
 	args := string(data)
@@ -67,12 +67,12 @@ func TestNotifier_NotifyExited(t *testing.T) {
 func TestNotifier_SignalCLINotFound(t *testing.T) {
 	n := notifier.New("/nonexistent/signal-cli", "+447700000000")
 	// Must not panic — just log the error.
-	n.Notify("AAPL_US_EQ", true, 9.30)
+	n.Notify("AAPL_US_EQ", true, 9.30, "$")
 }
 
 func TestNotifier_ImplementsPollerNotifier(t *testing.T) {
 	// Compile-time interface satisfaction check.
 	var _ interface {
-		Notify(ticker string, entered bool, profitPerShare float64)
+		Notify(ticker string, entered bool, profitPerShare float64, currencySymbol string)
 	} = (*notifier.Notifier)(nil)
 }

@@ -7,7 +7,9 @@
   const tbodyEl = document.getElementById('tbody');
   const emptyEl = document.getElementById('empty');
 
-  function fmt(n) { return '£' + n.toFixed(2); }
+  var symbols = { GBP: '£', USD: '$', EUR: '€' };
+  function sym(currency) { return symbols[currency] || currency + ' '; }
+  function fmt(n, currency) { return sym(currency) + n.toFixed(2); }
 
   function render(msg) {
     const positions = msg.positions || [];
@@ -20,14 +22,15 @@
       emptyEl.classList.add('hidden');
       tableEl.classList.remove('hidden');
       positions.forEach(function (p) {
+        const c = p.currency || 'GBP';
         const tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + p.ticker + '</td>' +
           '<td>' + p.quantity + '</td>' +
-          '<td>' + fmt(p.averagePrice) + '</td>' +
-          '<td>' + fmt(p.currentPrice) + '</td>' +
-          '<td class="profit">+' + fmt(p.profitPerShare) + '</td>' +
-          '<td>' + fmt(p.marketValue) + '</td>';
+          '<td>' + fmt(p.averagePrice, c) + '</td>' +
+          '<td>' + fmt(p.currentPrice, c) + '</td>' +
+          '<td class="profit">+' + fmt(p.profitPerShare, c) + '</td>' +
+          '<td>' + fmt(p.marketValue, c) + '</td>';
         tbodyEl.appendChild(tr);
       });
     }

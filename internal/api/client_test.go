@@ -21,7 +21,7 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 		w.Header().Set("x-ratelimit-remaining", "59")
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"instrument": map[string]any{"ticker": "AAPL_US_EQ"}, "quantity": 3.0, "averagePricePaid": 173.20, "currentPrice": 182.50}, // T212 wire format
+			{"instrument": map[string]any{"ticker": "AAPL_US_EQ", "currencyCode": "USD"}, "quantity": 3.0, "averagePricePaid": 173.20, "currentPrice": 182.50}, // T212 wire format
 		})
 	}))
 	defer srv.Close()
@@ -36,6 +36,9 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 	}
 	if positions[0].Ticker != "AAPL_US_EQ" {
 		t.Errorf("ticker: got %q, want AAPL_US_EQ", positions[0].Ticker)
+	}
+	if positions[0].Currency != "USD" {
+		t.Errorf("currency: got %q, want USD", positions[0].Currency)
 	}
 	if rl.Remaining != 59 {
 		t.Errorf("ratelimit remaining: got %d, want 59", rl.Remaining)
@@ -104,6 +107,9 @@ func TestClient_FetchPositions_GBXConversion(t *testing.T) {
 	p := positions[0]
 	if p.Ticker != "LLOY_EQ" {
 		t.Errorf("ticker: got %q, want LLOY_EQ", p.Ticker)
+	}
+	if p.Currency != "GBP" {
+		t.Errorf("currency: got %q, want GBP (GBX normalised)", p.Currency)
 	}
 	// Prices must be divided by 100: GBX → GBP
 	if p.AveragePrice != 55.00 {

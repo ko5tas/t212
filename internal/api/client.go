@@ -82,12 +82,15 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 	for i, r := range raw {
 		avg := r.AveragePrice
 		curr := r.CurrentPrice
-		if r.Instrument.CurrencyCode == "GBX" {
+		currency := r.Instrument.CurrencyCode
+		if currency == "GBX" {
 			avg /= 100
 			curr /= 100
+			currency = "GBP"
 		}
 		positions[i] = Position{
 			Ticker:       r.Instrument.Ticker,
+			Currency:     currency,
 			Quantity:     r.Quantity,
 			AveragePrice: avg,
 			CurrentPrice: curr,

@@ -92,7 +92,7 @@ func (m Model) View() string {
 	}
 
 	out := titleStyle.Render("T212 Dashboard") + "\n"
-	out += dimStyle.Render("Positions with profit > £1/share  [q: quit]") + "\n\n"
+	out += dimStyle.Render("Positions with profit > 1/share  [q: quit]") + "\n\n"
 
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions above threshold") + "\n"
@@ -106,10 +106,13 @@ func (m Model) View() string {
 			headerStyle.Render("MKT VALUE"),
 		)
 		for _, p := range m.positions {
-			out += fmt.Sprintf("%-20s %10.4f %12.2f %13.2f %s %14.2f\n",
-				p.Ticker, p.Quantity, p.AveragePrice, p.CurrentPrice,
-				profitStyle.Render(fmt.Sprintf("%+13.2f", p.ProfitPerShare)),
-				p.MarketValue,
+			sym := p.CurrencySymbol()
+			out += fmt.Sprintf("%-20s %10.4f %s%11.2f %s%12.2f %s %s%13.2f\n",
+				p.Ticker, p.Quantity,
+				sym, p.AveragePrice,
+				sym, p.CurrentPrice,
+				profitStyle.Render(fmt.Sprintf("%s%+12.2f", sym, p.ProfitPerShare)),
+				sym, p.MarketValue,
 			)
 		}
 	}

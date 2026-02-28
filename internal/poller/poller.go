@@ -111,14 +111,14 @@ func (p *Poller) sendNotifications(filtered []api.Position) {
 	// Detect edge: entered threshold.
 	for ticker, pos := range nowAbove {
 		if !p.prevAbove[ticker] {
-			p.notifier.Notify(ticker, true, pos.ProfitPerShare)
+			p.notifier.Notify(ticker, true, pos.ProfitPerShare, pos.CurrencySymbol())
 		}
 	}
 
 	// Detect edge: exited threshold.
 	for ticker := range p.prevAbove {
 		if _, ok := nowAbove[ticker]; !ok {
-			p.notifier.Notify(ticker, false, 0)
+			p.notifier.Notify(ticker, false, 0, "")
 		}
 	}
 

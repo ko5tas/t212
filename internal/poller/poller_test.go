@@ -18,15 +18,16 @@ import (
 )
 
 // t212Wire converts a Position slice to the T212 API wire format for mock servers.
-// The wire format nests the ticker inside an "instrument" object and uses "averagePricePaid".
+// The wire format nests the ticker and currencyCode inside an "instrument" object
+// and uses "averagePricePaid".
 func t212Wire(positions []api.Position) []map[string]any {
 	out := make([]map[string]any, len(positions))
 	for i, p := range positions {
 		out[i] = map[string]any{
-			"instrument":      map[string]any{"ticker": p.Ticker},
-			"quantity":        p.Quantity,
+			"instrument":       map[string]any{"ticker": p.Ticker, "currencyCode": p.Currency},
+			"quantity":         p.Quantity,
 			"averagePricePaid": p.AveragePrice,
-			"currentPrice":    p.CurrentPrice,
+			"currentPrice":     p.CurrentPrice,
 		}
 	}
 	return out
@@ -44,7 +45,7 @@ func makeServer(t *testing.T, positions []api.Position, callCount *atomic.Int32)
 
 func TestPoller_PollsAndStores(t *testing.T) {
 	positions := []api.Position{
-		{Ticker: "AAPL_US_EQ", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50},
+		{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50},
 	}
 	var callCount atomic.Int32
 	srv := makeServer(t, positions, &callCount)
@@ -76,8 +77,8 @@ func TestPoller_PollsAndStores(t *testing.T) {
 
 func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
 	positions := []api.Position{
-		{Ticker: "AAPL_US_EQ", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50}, // profit 9.30 > 1
-		{Ticker: "TSLA_US_EQ", Quantity: 1, AveragePrice: 200.00, CurrentPrice: 199.00}, // loss — filtered out
+		{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50}, // profit 9.30 > 1
+		{Ticker: "TSLA_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 200.00, CurrentPrice: 199.00}, // loss — filtered out
 	}
 	var callCount atomic.Int32
 	srv := makeServer(t, positions, &callCount)
@@ -148,15 +149,16 @@ type mockNotifier struct {
 }
 
 type notifyCall struct {
-	ticker  string
-	entered bool
-	profit  float64
+	ticker         string
+	entered        bool
+	profit         float64
+	currencySymbol string
 }
 
-func (m *mockNotifier) Notify(ticker string, entered bool, profitPerShare float64) {
+func (m *mockNotifier) Notify(ticker string, entered bool, profitPerShare float64, currencySymbol string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.calls = append(m.calls, notifyCall{ticker, entered, profitPerShare})
+	m.calls = append(m.calls, notifyCall{ticker, entered, profitPerShare, currencySymbol})
 }
 
 func (m *mockNotifier) Calls() []notifyCall {
@@ -196,8 +198,8 @@ func drainBroadcasts(t *testing.T, ch <-chan []byte, n int, timeout time.Duratio
 }
 
 var (
-	posBelow = []api.Position{{Ticker: "AAPL_US_EQ", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50}} // profit 0.50 ≤ 1.00
-	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00}} // profit 10.00 > 1.00
+	posBelow = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50}} // profit 0.50 ≤ 1.00
+	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00}} // profit 10.00 > 1.00
 )
 
 func TestSendNotifications_EnterThreshold(t *testing.T) {
