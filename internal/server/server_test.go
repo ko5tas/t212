@@ -1,7 +1,9 @@
 package server_test
 
 import (
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,6 +81,45 @@ func TestServer_WebSocketReceivesBroadcast(t *testing.T) {
 	}
 	if string(msg) != string(b) {
 		t.Errorf("got %q, want %q", msg, b)
+	}
+}
+
+func TestServer_GracefulShutdown(t *testing.T) {
+	h := hub.New()
+	_ = server.New(h, "127.0.0.1:0") // ensure New compiles with unused var
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	started := make(chan struct{})
+	done := make(chan error, 1)
+
+	// Find a free port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := listener.Addr().String()
+	listener.Close()
+
+	srv2 := server.New(h, addr)
+	go func() {
+		close(started)
+		done <- srv2.Start(ctx)
+	}()
+
+	<-started
+	time.Sleep(50 * time.Millisecond) // let server bind
+
+	// Cancel context — should trigger graceful shutdown
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Start returned error on graceful shutdown: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not shut down within 5 seconds")
 	}
 }
 

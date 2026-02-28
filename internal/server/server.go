@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/ko5tas/t212/internal/hub"
@@ -50,10 +52,36 @@ func (s *Server) Handler() http.Handler {
 	return secureHeaders(mux)
 }
 
-// Start binds and serves. Blocks until the server errors.
-func (s *Server) Start() error {
+// Start binds and serves until ctx is cancelled, then performs a graceful shutdown
+// with a 10-second drain timeout. Returns any error from ListenAndServe (other than
+// http.ErrServerClosed which is expected on shutdown).
+func (s *Server) Start(ctx context.Context) error {
+	httpSrv := &http.Server{
+		Addr:    s.addr,
+		Handler: s.Handler(),
+	}
+
 	slog.Info("web server starting", "addr", s.addr)
-	return http.ListenAndServe(s.addr, s.Handler())
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("server shutdown error", "err", err)
+		}
+		return nil
+	}
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
