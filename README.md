@@ -226,7 +226,7 @@ Override the Pi host: `make deploy PI_HOST=user@192.168.1.10`
 | Concern | Decision | Rationale |
 |---|---|---|
 | Filter rule | `currentPrice − averagePrice > £1.00` (strict greater-than) | Simple, predictable, no floating-point ambiguity at the boundary |
-| Polling rate | 1 req/s | T212 API maximum for `/equity/positions` |
+| Polling rate | 1 req/min | Conservative interval to avoid 429s from T212 |
 | WebSocket fan-out | Buffered channels (size 8), slow subscribers skipped | Prevents one slow client from blocking the broadcast loop |
 | No database | In-memory store only | Data is live prices; stale data on restart is fine |
 | Signal transport | Linked device (not a separate Signal account) | Simpler setup; no secondary phone number needed |

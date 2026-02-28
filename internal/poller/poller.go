@@ -12,7 +12,7 @@ import (
 	"github.com/ko5tas/t212/internal/store"
 )
 
-const pollInterval = time.Second
+const pollInterval = time.Minute
 
 // BroadcastMessage is the JSON payload sent to WebSocket subscribers on each poll.
 type BroadcastMessage struct {
@@ -28,6 +28,7 @@ type Poller struct {
 	threshold float64
 	notifier  Notifier
 	prevAbove map[string]bool
+	interval  time.Duration
 }
 
 // New creates a Poller. notifier may be nil (no alerts sent).
@@ -39,7 +40,15 @@ func New(client *api.Client, s *store.Store, h *hub.Hub, threshold float64, n No
 		threshold: threshold,
 		notifier:  n,
 		prevAbove: make(map[string]bool),
+		interval:  pollInterval,
 	}
+}
+
+// NewForTesting creates a Poller with a custom poll interval. Intended for tests only.
+func NewForTesting(client *api.Client, s *store.Store, h *hub.Hub, threshold float64, n Notifier, interval time.Duration) *Poller {
+	p := New(client, s, h, threshold, n)
+	p.interval = interval
+	return p
 }
 
 // Run starts the polling loop. Blocks until ctx is cancelled.
@@ -47,7 +56,7 @@ func New(client *api.Client, s *store.Store, h *hub.Hub, threshold float64, n No
 func (p *Poller) Run(ctx context.Context) {
 	p.poll(ctx)
 
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
 
 	for {
