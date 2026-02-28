@@ -9,16 +9,12 @@
       "Bash(git *)",
       "Bash(go *)",
       "Bash(make *)",
-      "Bash(diff \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/web/index.html\" \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/internal/server/web/index.html\")",
-      "Bash(diff \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/web/app.js\" \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/internal/server/web/app.js\")",
-      "Bash(diff \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/web/style.css\" \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/internal/server/web/style.css\")",
+      "Bash(diff *)",
       "Bash(GOARCH=arm64 GOOS=linux go build -o t212-arm64 ./cmd/t212)",
       "Bash(bash -n scripts/*)",
       "Bash(printenv TMPDIR)",
-      "Bash(echo \"exit:$?\")",
-      "Bash(cat \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/Makefile\")",
-      "Bash(cat \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/go.mod\")",
-      "Bash(cat \"/Users/kostas/Dropbox/Mac \\(5\\)/Documents/dev/github.com/ko5tas/t212/go.sum\")"
+      "Bash(echo *)",
+      "Bash(curl *)"
     ],
     "additionalDirectories": [
       "/Users/kostas/.claude/projects/-Users-kostas-Dropbox-Mac--5--Documents-dev-github-com-ko5tas-t212"
