@@ -5,7 +5,9 @@ PI_BIN_DIR  := /usr/local/bin
 PI_SVC_DIR  := /etc/systemd/system
 PI_CFG_DIR  := /etc/t212
 
-.PHONY: build build-arm test lint security deploy setup-signal update-signal-cli logs clean
+VERSION     ?= $(shell v=$$(git describe --tags --abbrev=0 2>/dev/null) && echo "$$v" | sed 's/^v//' || echo "0.0.0-dev")
+
+.PHONY: build build-arm test lint security deb deploy setup-signal update-signal-cli logs clean
 
 ## build: compile for current platform
 build:
@@ -14,6 +16,12 @@ build:
 ## build-arm: cross-compile for Raspberry Pi 5 (linux/arm64)
 build-arm:
 	GOARCH=arm64 GOOS=linux go build -o $(BINARY_ARM) ./cmd/t212
+
+## deb: build .deb package for linux/arm64 (requires nfpm: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0)
+deb: build-arm
+	@command -v nfpm >/dev/null 2>&1 || { echo "nfpm not found. Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0"; exit 1; }
+	VERSION=$(VERSION) nfpm package --packager deb --target .
+	@echo "Built: t212_$(VERSION)_arm64.deb"
 
 ## test: run all tests with race detector and coverage
 test:
@@ -52,4 +60,4 @@ logs:
 
 ## clean: remove build artifacts
 clean:
-	rm -f $(BINARY) $(BINARY_ARM) coverage.out
+	rm -f $(BINARY) $(BINARY_ARM) coverage.out *.deb

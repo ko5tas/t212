@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run tests with race detector
+        run: go test -race ./...
+
+  release:
+    name: Build .deb and publish release
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Cross-compile for linux/arm64
+        run: GOARCH=arm64 GOOS=linux go build -o t212-arm64 ./cmd/t212
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0
+      - name: Build .deb
+        run: VERSION=${{ github.ref_name }} nfpm package --packager deb --target .
+      - name: Create GitHub Release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            t212_${{ github.ref_name }}_arm64.deb
+        env:
+          GH_TOKEN: ${{ github.token }}

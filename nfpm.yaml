@@ -1,0 +1,33 @@
+name: t212
+arch: arm64
+platform: linux
+version: "${VERSION}"
+section: utils
+priority: optional
+maintainer: "t212 <noreply@github.com>"
+description: |
+  Trading 212 portfolio dashboard.
+  Polls live positions every second, filters by the £1 profit-per-share
+  threshold, serves a WebSocket-powered web UI, and sends Signal
+  notifications on threshold crossings.
+homepage: https://github.com/ko5tas/t212
+
+contents:
+  - src: ./t212-arm64
+    dst: /usr/local/bin/t212
+    file_info:
+      mode: 0755
+
+  - src: ./deploy/t212.service
+    dst: /etc/systemd/system/t212.service
+
+  - src: ./deploy/config.env.example
+    dst: /etc/t212/config.env
+    type: config|noreplace
+    file_info:
+      mode: 0600
+
+scripts:
+  postinstall: ./deploy/postinst.sh
+  preremove:   ./deploy/prerm.sh
+  postremove:  ./deploy/postrm.sh
