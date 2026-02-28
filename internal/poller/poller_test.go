@@ -37,7 +37,7 @@ func TestPoller_PollsAndStores(t *testing.T) {
 
 	s := store.New()
 	h := hub.New()
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, nil)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,7 +73,7 @@ func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
 	ch, unsub := h.Subscribe()
 	defer unsub()
 
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, nil)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -105,7 +105,7 @@ func TestPoller_StopsOnContextCancel(t *testing.T) {
 
 	s := store.New()
 	h := hub.New()
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, nil)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -197,7 +197,7 @@ func TestSendNotifications_EnterThreshold(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -230,7 +230,7 @@ func TestSendNotifications_ExitThreshold(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -267,7 +267,7 @@ func TestSendNotifications_NoDoubleNotifyOnStay(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
@@ -299,7 +299,7 @@ func TestSendNotifications_Oscillate(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+	p := poller.New(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()

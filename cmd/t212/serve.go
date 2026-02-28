@@ -21,6 +21,10 @@ func runServe() error {
 	if apiKey == "" {
 		return fmt.Errorf("T212_API_KEY environment variable is not set")
 	}
+	apiSecret := os.Getenv("T212_API_SECRET")
+	if apiSecret == "" {
+		return fmt.Errorf("T212_API_SECRET environment variable is not set")
+	}
 
 	signalNumber := os.Getenv("SIGNAL_NUMBER")
 	signalCLIPath := os.Getenv("SIGNAL_CLI_PATH")
@@ -41,7 +45,7 @@ func runServe() error {
 		"signal_enabled", signalNumber != "",
 	)
 
-	apiClient := api.NewClient(apiKey, "https://live.trading212.com", nil)
+	apiClient := api.NewClient(apiKey, apiSecret, "https://live.trading212.com", nil)
 	s := store.New()
 	h := hub.New()
 

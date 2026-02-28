@@ -116,13 +116,14 @@ All configuration is via environment variables (or `/etc/t212/config.env` in pro
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `T212_API_KEY` | Yes | — | Trading 212 live API key |
+| `T212_API_KEY` | Yes | — | Trading 212 API key ID (shown when generating the key) |
+| `T212_API_SECRET` | Yes | — | Trading 212 API secret key (shown once at generation time) |
 | `T212_PORT` | No | `8080` | Port for the web server |
 | `SIGNAL_NUMBER` | No | — | Your phone number in E.164 format (`+447700…`). Omit to disable Signal notifications. |
 | `SIGNAL_CLI_PATH` | No | `/usr/local/bin/signal-cli` | Path to the `signal-cli` binary |
 | `T212_HOST` | No | `localhost` | Host for `t212 tui` to connect to (TUI subcommand only) |
 
-`T212_API_KEY` is loaded once at startup, never logged, and never written to disk.
+`T212_API_KEY` and `T212_API_SECRET` are combined as HTTP Basic auth, loaded once at startup, never logged, and never written to disk.
 
 ---
 

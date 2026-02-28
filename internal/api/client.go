@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,11 +17,12 @@ const positionsPath = "/api/v0/equity/positions"
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
-	apiKey     string
+	authHeader string
 }
 
-// NewClient creates a Client. If httpClient is nil, a default client with TLS 1.3 is used.
-func NewClient(apiKey, baseURL string, httpClient *http.Client) *Client {
+// NewClient creates a Client. apiKeyID and apiSecret are combined as HTTP Basic auth.
+// If httpClient is nil, a default client with TLS 1.3 is used.
+func NewClient(apiKeyID, apiSecret, baseURL string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{
 			Timeout: 10 * time.Second,
@@ -31,10 +33,11 @@ func NewClient(apiKey, baseURL string, httpClient *http.Client) *Client {
 			},
 		}
 	}
+	auth := base64.StdEncoding.EncodeToString([]byte(apiKeyID + ":" + apiSecret))
 	return &Client{
 		httpClient: httpClient,
 		baseURL:    baseURL,
-		apiKey:     apiKey,
+		authHeader: "Basic " + auth,
 	}
 }
 
@@ -45,7 +48,7 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 	if err != nil {
 		return nil, RateLimitInfo{}, fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("Authorization", c.authHeader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

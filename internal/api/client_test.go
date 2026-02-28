@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +26,7 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := api.NewClient("test-key", srv.URL, srv.Client())
+	c := api.NewClient("test-key", "test-secret", srv.URL, srv.Client())
 	positions, rl, err := c.FetchPositions(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -51,13 +52,14 @@ func TestClient_FetchPositions_AuthHeader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := api.NewClient("my-secret-key", srv.URL, srv.Client())
+	c := api.NewClient("my-key-id", "my-secret", srv.URL, srv.Client())
 	_, _, err := c.FetchPositions(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotAuth != "my-secret-key" {
-		t.Errorf("Authorization header: got %q, want %q", gotAuth, "my-secret-key")
+	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("my-key-id:my-secret"))
+	if gotAuth != want {
+		t.Errorf("Authorization header: got %q, want %q", gotAuth, want)
 	}
 }
 
@@ -67,7 +69,7 @@ func TestClient_FetchPositions_Non200(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := api.NewClient("bad-key", srv.URL, srv.Client())
+	c := api.NewClient("bad-key", "bad-secret", srv.URL, srv.Client())
 	_, _, err := c.FetchPositions(context.Background())
 	if err == nil {
 		t.Fatal("expected error for 401, got nil")
