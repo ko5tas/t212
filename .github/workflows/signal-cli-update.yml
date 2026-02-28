@@ -26,11 +26,16 @@ jobs:
         if: steps.check.outputs.update_available == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.check.outputs.latest }}
         run: |
-          LATEST="${{ steps.check.outputs.latest }}"
           BRANCH="chore/signal-cli-${LATEST}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Skip if branch already exists (idempotent)
+          if git ls-remote --exit-code origin "refs/heads/${BRANCH}" > /dev/null 2>&1; then
+            echo "Branch ${BRANCH} already exists, skipping."
+            exit 0
+          fi
           git checkout -b "$BRANCH"
           echo "$LATEST" > .signal-cli-version
           git add .signal-cli-version

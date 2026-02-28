@@ -17,19 +17,19 @@ TARBALL="signal-cli-${LATEST#v}-Linux-aarch64.tar.gz"
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${TARBALL}"
 CHECKSUM_URL="${URL}.sha256sum"
 
-TMPDIR=$(mktemp -d)
-trap "rm -rf ${TMPDIR}" EXIT
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf ${WORK_DIR}' EXIT
 
 echo "Downloading ${TARBALL}..."
-curl -fsSL -o "${TMPDIR}/${TARBALL}" "${URL}"
-curl -fsSL -o "${TMPDIR}/${TARBALL}.sha256sum" "${CHECKSUM_URL}"
+curl -fsSL -o "${WORK_DIR}/${TARBALL}" "${URL}"
+curl -fsSL -o "${WORK_DIR}/${TARBALL}.sha256sum" "${CHECKSUM_URL}"
 
 echo "Verifying SHA256..."
-(cd "${TMPDIR}" && sha256sum -c "${TARBALL}.sha256sum")
+(cd "${WORK_DIR}" && sha256sum -c "${TARBALL}.sha256sum")
 
 echo "Installing on ${PI_HOST}..."
-tar -xzf "${TMPDIR}/${TARBALL}" -C "${TMPDIR}"
-scp "${TMPDIR}/signal-cli-${LATEST#v}-Linux-aarch64/bin/signal-cli" \
+tar -xzf "${WORK_DIR}/${TARBALL}" -C "${WORK_DIR}"
+scp "${WORK_DIR}/signal-cli-${LATEST#v}-Linux-aarch64/bin/signal-cli" \
     "${PI_HOST}:/tmp/signal-cli-new"
 ssh "${PI_HOST}" "sudo mv /tmp/signal-cli-new ${INSTALL_DIR}/signal-cli && \
                   sudo chmod 755 ${INSTALL_DIR}/signal-cli"
