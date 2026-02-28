@@ -59,7 +59,7 @@ func runServe() error {
 	go p.Run(ctx)
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- srv.Start() }()
+	go func() { errCh <- srv.Start(ctx) }()
 
 	select {
 	case <-ctx.Done():
