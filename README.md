@@ -56,6 +56,37 @@ sendNotifications → signal-cli subprocess → Signal message
 
 ---
 
+## Installation (DietPi / Raspberry Pi 5)
+
+Download the latest `.deb` from the [Releases page](https://github.com/ko5tas/t212/releases/latest):
+
+```bash
+wget https://github.com/ko5tas/t212/releases/latest/download/t212_<version>_arm64.deb
+sudo dpkg -i t212_<version>_arm64.deb
+```
+
+The installer prints the exact steps to configure and start the service. In summary:
+
+```bash
+# 1. Set your API key (and optionally SIGNAL_NUMBER, T212_PORT)
+sudo nano /etc/t212/config.env
+
+# 2. Start the service
+sudo systemctl start t212
+
+# 3. Verify
+sudo systemctl status t212
+sudo journalctl -u t212 -f
+```
+
+Open `http://<raspberry-pi-ip>:8080` in a browser on the same LAN.
+
+**Upgrading:** re-download and `sudo dpkg -i t212_<new-version>_arm64.deb`. Your `/etc/t212/config.env` is preserved automatically.
+
+**Removing:** `sudo dpkg -r t212` (config survives). `sudo dpkg --purge t212` (config deleted).
+
+---
+
 ## Quick start (local development)
 
 ```bash
@@ -175,6 +206,7 @@ Downloads the latest release from GitHub, verifies the SHA256 checksum, and repl
 |---|---|
 | `make build` | Compile for current platform |
 | `make build-arm` | Cross-compile for Raspberry Pi 5 (`linux/arm64`) |
+| `make deb` | Build `.deb` package for Raspberry Pi (requires `nfpm`: `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`) |
 | `make test` | Run all tests with race detector and coverage |
 | `make lint` | Run `golangci-lint` |
 | `make security` | Run `govulncheck` |
@@ -231,10 +263,15 @@ t212/
 │   └── tui/             # bubbletea terminal UI
 ├── internal/server/web/ # index.html, style.css, app.js (embedded)
 ├── deploy/
-│   ├── t212.service     # systemd unit
-│   └── config.env.example
+│   ├── t212.service       # systemd unit
+│   ├── config.env.example
+│   ├── postinst.sh        # dpkg post-install: create user, enable service, print instructions
+│   ├── prerm.sh           # dpkg pre-remove: stop and disable service
+│   └── postrm.sh          # dpkg post-remove: purge user and config on --purge
 ├── .github/workflows/
-│   └── ci.yml           # test + build-arm + govulncheck
+│   ├── ci.yml             # test + build-arm + govulncheck (on push/PR to main)
+│   └── release.yml        # test + build .deb + publish GitHub Release (on semver tags)
+├── nfpm.yaml              # nfpm package definition
 ├── Makefile
 └── go.mod
 ```
