@@ -21,7 +21,7 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 		w.Header().Set("x-ratelimit-remaining", "59")
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"instrument": "AAPL_US_EQ", "quantity": 3.0, "averagePricePaid": 173.20, "currentPrice": 182.50},
+			{"instrument": map[string]any{"ticker": "AAPL_US_EQ"}, "quantity": 3.0, "averagePricePaid": 173.20, "currentPrice": 182.50}, // T212 wire format
 		})
 	}))
 	defer srv.Close()

@@ -17,13 +17,28 @@ import (
 	"github.com/ko5tas/t212/internal/store"
 )
 
+// t212Wire converts a Position slice to the T212 API wire format for mock servers.
+// The wire format nests the ticker inside an "instrument" object and uses "averagePricePaid".
+func t212Wire(positions []api.Position) []map[string]any {
+	out := make([]map[string]any, len(positions))
+	for i, p := range positions {
+		out[i] = map[string]any{
+			"instrument":      map[string]any{"ticker": p.Ticker},
+			"quantity":        p.Quantity,
+			"averagePricePaid": p.AveragePrice,
+			"currentPrice":    p.CurrentPrice,
+		}
+	}
+	return out
+}
+
 func makeServer(t *testing.T, positions []api.Position, callCount *atomic.Int32) *httptest.Server {
 	t.Helper()
 	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount.Add(1)
 		w.Header().Set("x-ratelimit-remaining", "10")
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
-		json.NewEncoder(w).Encode(positions)
+		json.NewEncoder(w).Encode(t212Wire(positions))
 	}))
 }
 
@@ -162,7 +177,7 @@ func makeSequenceServer(t *testing.T, responses [][]api.Position) *httptest.Serv
 		}
 		w.Header().Set("x-ratelimit-remaining", "10")
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
-		json.NewEncoder(w).Encode(responses[i])
+		json.NewEncoder(w).Encode(t212Wire(responses[i]))
 	}))
 }
 

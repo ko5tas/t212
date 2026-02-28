@@ -7,13 +7,12 @@ import (
 	"github.com/ko5tas/t212/internal/api"
 )
 
-// TestPosition_UnmarshalJSON_RealAPIFields tests against the actual T212 API field names:
-// "instrument" (not "ticker") and "averagePricePaid" (not "averagePrice").
-func TestPosition_UnmarshalJSON_RealAPIFields(t *testing.T) {
+func TestPosition_UnmarshalJSON(t *testing.T) {
+	// Position uses standard JSON tags for the internal/broadcast format.
 	raw := `{
-		"instrument": "AAPL_US_EQ",
+		"ticker": "AAPL_US_EQ",
 		"quantity": 3.0,
-		"averagePricePaid": 173.20,
+		"averagePrice": 173.20,
 		"currentPrice": 182.50
 	}`
 

@@ -60,12 +60,27 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 		return nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	var positions []Position
-	if err := json.NewDecoder(resp.Body).Decode(&positions); err != nil {
+	// The T212 API wire format nests the ticker inside an "instrument" object
+	// and uses "averagePricePaid" for the average price field.
+	type wirePosition struct {
+		Instrument   struct{ Ticker string `json:"ticker"` } `json:"instrument"`
+		Quantity     float64 `json:"quantity"`
+		AveragePrice float64 `json:"averagePricePaid"`
+		CurrentPrice float64 `json:"currentPrice"`
+	}
+	var raw []wirePosition
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, RateLimitInfo{}, fmt.Errorf("decode response: %w", err)
 	}
 
-	for i := range positions {
+	positions := make([]Position, len(raw))
+	for i, r := range raw {
+		positions[i] = Position{
+			Ticker:       r.Instrument.Ticker,
+			Quantity:     r.Quantity,
+			AveragePrice: r.AveragePrice,
+			CurrentPrice: r.CurrentPrice,
+		}
 		positions[i].Compute()
 	}
 
