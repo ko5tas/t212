@@ -17,8 +17,10 @@ case "$1" in
         chmod 0600 /etc/t212/config.env
 
         # Register and enable the service (does NOT start it)
-        systemctl daemon-reload
-        systemctl enable t212
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+            systemctl enable t212
+        fi
 
         echo ""
         echo "================================================================"
@@ -44,7 +46,9 @@ case "$1" in
         echo "       sudo systemctl status t212"
         echo "       sudo journalctl -u t212 -f"
         echo ""
-        echo "  4. Open the web UI at:  http://$(hostname):8080"
+        echo "  4. Open the web UI in a browser:"
+        echo "       http://localhost:8080        (from this machine)"
+        echo "       http://<this-host-ip>:8080   (from another device on the LAN)"
         echo ""
         echo "================================================================"
         echo ""
