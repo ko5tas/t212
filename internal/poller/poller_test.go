@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -120,5 +121,204 @@ func TestPoller_StopsOnContextCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("poller did not stop after context cancel")
+	}
+}
+
+// ------------ sendNotifications edge-detection tests ------------
+
+// mockNotifier captures Notify calls for assertion in tests.
+type mockNotifier struct {
+	mu    sync.Mutex
+	calls []notifyCall
+}
+
+type notifyCall struct {
+	ticker  string
+	entered bool
+	profit  float64
+}
+
+func (m *mockNotifier) Notify(ticker string, entered bool, profitPerShare float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls = append(m.calls, notifyCall{ticker, entered, profitPerShare})
+}
+
+func (m *mockNotifier) Calls() []notifyCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]notifyCall(nil), m.calls...)
+}
+
+// makeSequenceServer returns a TLS server that replies with responses[i] on the
+// i-th request, clamping to the last element once all are exhausted.
+func makeSequenceServer(t *testing.T, responses [][]api.Position) *httptest.Server {
+	t.Helper()
+	var idx atomic.Int32
+	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		i := int(idx.Add(1)) - 1
+		if i >= len(responses) {
+			i = len(responses) - 1
+		}
+		w.Header().Set("x-ratelimit-remaining", "10")
+		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
+		json.NewEncoder(w).Encode(responses[i])
+	}))
+}
+
+// drainBroadcasts reads n messages from ch. Because sendNotifications is called
+// before broadcast in poll(), receiving a broadcast guarantees the corresponding
+// notifications have already been dispatched.
+func drainBroadcasts(t *testing.T, ch <-chan []byte, n int, timeout time.Duration) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		select {
+		case <-ch:
+		case <-time.After(timeout):
+			t.Fatalf("timeout waiting for broadcast %d/%d", i+1, n)
+		}
+	}
+}
+
+var (
+	posBelow = []api.Position{{Ticker: "AAPL_US_EQ", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50}} // profit 0.50 ≤ 1.00
+	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00}} // profit 10.00 > 1.00
+)
+
+func TestSendNotifications_EnterThreshold(t *testing.T) {
+	// Poll 1: below threshold → no notification.
+	// Poll 2: above threshold → enter notification.
+	srv := makeSequenceServer(t, [][]api.Position{posBelow, posAbove})
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	broadcastCh, unsub := h.Subscribe()
+	defer unsub()
+
+	n := &mockNotifier{}
+	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	drainBroadcasts(t, broadcastCh, 2, 3*time.Second)
+	cancel()
+
+	calls := n.Calls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 notification, got %d: %+v", len(calls), calls)
+	}
+	if !calls[0].entered || calls[0].ticker != "AAPL_US_EQ" {
+		t.Errorf("expected enter notification for AAPL, got: %+v", calls[0])
+	}
+	if calls[0].profit != 10.00 {
+		t.Errorf("expected profit 10.00, got %v", calls[0].profit)
+	}
+}
+
+func TestSendNotifications_ExitThreshold(t *testing.T) {
+	// Poll 1: above threshold → enter notification.
+	// Poll 2: below threshold → exit notification.
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posBelow})
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	broadcastCh, unsub := h.Subscribe()
+	defer unsub()
+
+	n := &mockNotifier{}
+	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	drainBroadcasts(t, broadcastCh, 2, 3*time.Second)
+	cancel()
+
+	calls := n.Calls()
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 notifications (enter+exit), got %d: %+v", len(calls), calls)
+	}
+	if !calls[0].entered {
+		t.Errorf("call[0] should be enter, got: %+v", calls[0])
+	}
+	if calls[1].entered {
+		t.Errorf("call[1] should be exit, got: %+v", calls[1])
+	}
+	if calls[1].ticker != "AAPL_US_EQ" {
+		t.Errorf("exit notification ticker mismatch: %+v", calls[1])
+	}
+}
+
+func TestSendNotifications_NoDoubleNotifyOnStay(t *testing.T) {
+	// Poll 1: above → enter notification.
+	// Poll 2: still above → no additional notification.
+	// Poll 3: still above → no additional notification.
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posAbove})
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	broadcastCh, unsub := h.Subscribe()
+	defer unsub()
+
+	n := &mockNotifier{}
+	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
+	cancel()
+
+	calls := n.Calls()
+	if len(calls) != 1 {
+		t.Fatalf("expected exactly 1 notification (entry only), got %d: %+v", len(calls), calls)
+	}
+	if !calls[0].entered {
+		t.Errorf("sole notification should be enter, got: %+v", calls[0])
+	}
+}
+
+func TestSendNotifications_Oscillate(t *testing.T) {
+	// Poll 1: above → enter notification.
+	// Poll 2: below → exit notification.
+	// Poll 3: above → enter notification again.
+	// Expected: 3 notifications total.
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posBelow, posAbove})
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	broadcastCh, unsub := h.Subscribe()
+	defer unsub()
+
+	n := &mockNotifier{}
+	p := poller.New(api.NewClient("test-key", srv.URL, srv.Client()), s, h, 1.00, n)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
+	cancel()
+
+	calls := n.Calls()
+	if len(calls) != 3 {
+		t.Fatalf("expected 3 notifications, got %d: %+v", len(calls), calls)
+	}
+	if !calls[0].entered {
+		t.Errorf("call[0] should be enter, got: %+v", calls[0])
+	}
+	if calls[1].entered {
+		t.Errorf("call[1] should be exit, got: %+v", calls[1])
+	}
+	if !calls[2].entered {
+		t.Errorf("call[2] should be enter (re-entry), got: %+v", calls[2])
 	}
 }

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(chmod *)",
+      "Bash(gh *)",
+      "Bash(add *)",
+      "Bash(git *)",
+      "Bash(go *)",
+      "Bash(make *)",
+      "Bash(diff *)",
+      "Bash(GOARCH=arm64 GOOS=linux go build -o t212-arm64 ./cmd/t212)",
+      "Bash(bash -n scripts/*)",
+      "Bash(printenv TMPDIR)",
+      "Bash(echo *)",
+      "Bash(curl *)"
+    ],
+    "additionalDirectories": [
+      "/Users/kostas/.claude/projects/-Users-kostas-Dropbox-Mac--5--Documents-dev-github-com-ko5tas-t212"
+    ]
+  }
+}

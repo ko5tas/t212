@@ -24,7 +24,7 @@
         tr.innerHTML =
           '<td>' + p.ticker + '</td>' +
           '<td>' + p.quantity + '</td>' +
-          '<td>' + fmt(p.avgPrice) + '</td>' +
+          '<td>' + fmt(p.averagePrice) + '</td>' +
           '<td>' + fmt(p.currentPrice) + '</td>' +
           '<td class="profit">+' + fmt(p.profitPerShare) + '</td>' +
           '<td>' + fmt(p.marketValue) + '</td>';
