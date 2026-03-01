@@ -196,3 +196,33 @@ func TestClient_FetchOrderHistory_ByTicker(t *testing.T) {
 		t.Errorf("ticker param: got %q, want AAPL_US_EQ", gotTicker)
 	}
 }
+
+func TestClient_FetchDividendHistory(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v0/equity/history/dividends" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"amount": 3.50, "ticker": "GOOGL_US_EQ", "paidOn": "2025-12-15T00:00:00Z"},
+			},
+			"nextPagePath": nil,
+		})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	divs, err := c.FetchDividendHistory(context.Background(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(divs) != 1 {
+		t.Fatalf("expected 1 dividend, got %d", len(divs))
+	}
+	if divs[0].Amount != 3.50 {
+		t.Errorf("amount: got %v, want 3.50", divs[0].Amount)
+	}
+	if divs[0].Ticker != "GOOGL_US_EQ" {
+		t.Errorf("ticker: got %q, want GOOGL_US_EQ", divs[0].Ticker)
+	}
+}

@@ -168,6 +168,33 @@ func (c *Client) FetchOrderHistory(ctx context.Context, ticker string) ([]Histor
 	return all, nil
 }
 
+// FetchDividendHistory fetches all dividend payments, paginating automatically.
+// Pass "" for ticker to fetch all stocks.
+func (c *Client) FetchDividendHistory(ctx context.Context, ticker string) ([]DividendItem, error) {
+	path := dividendHistoryPath + fmt.Sprintf("?limit=%d", historyPageLimit)
+	if ticker != "" {
+		path += "&ticker=" + ticker
+	}
+	var all []DividendItem
+	for {
+		page, nextPath, err := fetchHistoryPage[DividendItem](c, ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("fetch dividend history: %w", err)
+		}
+		all = append(all, page...)
+		if nextPath == nil {
+			break
+		}
+		path = *nextPath
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(historyRateDelay):
+		}
+	}
+	return all, nil
+}
+
 func fetchHistoryPage[T any](c *Client, ctx context.Context, path string) ([]T, *string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
