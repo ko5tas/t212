@@ -12,7 +12,13 @@ import (
 	"time"
 )
 
-const positionsPath = "/api/v0/equity/positions"
+const (
+	positionsPath       = "/api/v0/equity/positions"
+	orderHistoryPath    = "/api/v0/equity/history/orders"
+	dividendHistoryPath = "/api/v0/equity/history/dividends"
+	historyPageLimit    = 50
+	historyRateDelay    = 11 * time.Second // stay under 6 req/min
+)
 
 // Client is a Trading 212 API client.
 type Client struct {
@@ -133,4 +139,55 @@ func parseRateLimit(resp *http.Response) RateLimitInfo {
 		Remaining: remaining,
 		Reset:     time.Unix(resetUnix, 0),
 	}
+}
+
+// FetchOrderHistory fetches all order fills, paginating automatically.
+// Pass "" for ticker to fetch all stocks.
+func (c *Client) FetchOrderHistory(ctx context.Context, ticker string) ([]HistoricalOrder, error) {
+	path := orderHistoryPath + fmt.Sprintf("?limit=%d", historyPageLimit)
+	if ticker != "" {
+		path += "&ticker=" + ticker
+	}
+	var all []HistoricalOrder
+	for {
+		page, nextPath, err := fetchHistoryPage[HistoricalOrder](c, ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("fetch order history: %w", err)
+		}
+		all = append(all, page...)
+		if nextPath == nil {
+			break
+		}
+		path = *nextPath
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(historyRateDelay):
+		}
+	}
+	return all, nil
+}
+
+func fetchHistoryPage[T any](c *Client, ctx context.Context, path string) ([]T, *string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", c.authHeader)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	var page PaginatedResponse[T]
+	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+		return nil, nil, fmt.Errorf("decode: %w", err)
+	}
+	return page.Items, page.NextPagePath, nil
 }

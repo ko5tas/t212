@@ -127,3 +127,72 @@ func TestClient_FetchPositions_GBXConversion(t *testing.T) {
 		t.Errorf("MarketValue: got %v, want ~%v", p.MarketValue, wantMV)
 	}
 }
+
+func TestClient_FetchOrderHistory(t *testing.T) {
+	page := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v0/equity/history/orders" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		page++
+		if page == 1 {
+			next := "/api/v0/equity/history/orders?cursor=123&limit=50"
+			json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"fill": map[string]any{
+							"price": 150.0, "quantity": 0.5, "filledAt": "2025-11-17T10:00:00Z",
+							"walletImpact": map[string]any{"netValue": 75.0, "currency": "GBP"},
+						},
+						"order": map[string]any{"ticker": "GOOGL_US_EQ", "side": "BUY", "status": "FILLED"},
+					},
+				},
+				"nextPagePath": next,
+			})
+		} else {
+			json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"fill": map[string]any{
+							"price": 155.0, "quantity": 0.2, "filledAt": "2025-12-01T10:00:00Z",
+							"walletImpact": map[string]any{"netValue": 31.0, "currency": "GBP"},
+						},
+						"order": map[string]any{"ticker": "GOOGL_US_EQ", "side": "SELL", "status": "FILLED"},
+					},
+				},
+				"nextPagePath": nil,
+			})
+		}
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	orders, err := c.FetchOrderHistory(context.Background(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(orders) != 2 {
+		t.Fatalf("expected 2 orders, got %d", len(orders))
+	}
+	if orders[0].Order.Side != "BUY" {
+		t.Errorf("order[0] side: got %q, want BUY", orders[0].Order.Side)
+	}
+	if orders[1].Fill.Impact.NetValue != 31.0 {
+		t.Errorf("order[1] netValue: got %v, want 31.0", orders[1].Fill.Impact.NetValue)
+	}
+}
+
+func TestClient_FetchOrderHistory_ByTicker(t *testing.T) {
+	var gotTicker string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotTicker = r.URL.Query().Get("ticker")
+		json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "nextPagePath": nil})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	c.FetchOrderHistory(context.Background(), "AAPL_US_EQ")
+	if gotTicker != "AAPL_US_EQ" {
+		t.Errorf("ticker param: got %q, want AAPL_US_EQ", gotTicker)
+	}
+}
