@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -30,11 +31,24 @@ type Server struct {
 	hub         *hub.Hub
 	addr        string
 	activeConns atomic.Int32
+	refreshCh   chan<- string
+}
+
+// Option configures a Server.
+type Option func(*Server)
+
+// WithRefreshChan sets the channel that receives refresh requests from WebSocket clients.
+func WithRefreshChan(ch chan<- string) Option {
+	return func(s *Server) { s.refreshCh = ch }
 }
 
 // New creates a Server.
-func New(h *hub.Hub, addr string) *Server {
-	return &Server{hub: h, addr: addr}
+func New(h *hub.Hub, addr string, opts ...Option) *Server {
+	s := &Server{hub: h, addr: addr}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // Handler returns the HTTP handler. Used directly in tests via httptest.NewServer.
@@ -106,11 +120,34 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	ch, unsub := s.hub.Subscribe()
 	defer unsub()
 
-	// Drain incoming messages (keep-alives, browser pings).
+	// Read incoming messages (refresh requests).
 	go func() {
 		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
+			_, raw, err := conn.ReadMessage()
+			if err != nil {
 				return
+			}
+			if s.refreshCh == nil {
+				continue
+			}
+			var msg struct {
+				Action string `json:"action"`
+				Ticker string `json:"ticker"`
+			}
+			if json.Unmarshal(raw, &msg) != nil {
+				continue
+			}
+			switch msg.Action {
+			case "refresh":
+				select {
+				case s.refreshCh <- msg.Ticker:
+				default:
+				}
+			case "refresh_all":
+				select {
+				case s.refreshCh <- "":
+				default:
+				}
 			}
 		}
 	}()

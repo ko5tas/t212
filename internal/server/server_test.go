@@ -152,3 +152,59 @@ func TestServer_WebSocketMaxConnections(t *testing.T) {
 		t.Errorf("expected 503, got %d", resp.StatusCode)
 	}
 }
+
+func TestServer_WebSocketRefreshMessage(t *testing.T) {
+	refreshCh := make(chan string, 8)
+	h := hub.New()
+	srv := server.New(h, ":0", server.WithRefreshChan(refreshCh))
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	conn.WriteMessage(websocket.TextMessage, []byte(`{"action":"refresh","ticker":"AAPL_US_EQ"}`))
+
+	select {
+	case ticker := <-refreshCh:
+		if ticker != "AAPL_US_EQ" {
+			t.Errorf("got ticker %q, want AAPL_US_EQ", ticker)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for refresh request")
+	}
+}
+
+func TestServer_WebSocketRefreshAll(t *testing.T) {
+	refreshCh := make(chan string, 8)
+	h := hub.New()
+	srv := server.New(h, ":0", server.WithRefreshChan(refreshCh))
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	time.Sleep(50 * time.Millisecond)
+
+	conn.WriteMessage(websocket.TextMessage, []byte(`{"action":"refresh_all"}`))
+
+	select {
+	case ticker := <-refreshCh:
+		if ticker != "" {
+			t.Errorf("got ticker %q, want empty string for refresh_all", ticker)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for refresh_all")
+	}
+}
