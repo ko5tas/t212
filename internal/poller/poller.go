@@ -231,22 +231,22 @@ func (p *Poller) refreshHistory(ctx context.Context, ticker string) {
 			tickers[t] = true
 		}
 		for t := range tickers {
-			pps, qty := findPosition(positions, t)
-			all[t] = history.ComputeReturns(ordersByTicker[t], divsByTicker[t], pps, qty)
+			price, qty, cur := findPosition(positions, t)
+			all[t] = history.ComputeReturns(ordersByTicker[t], divsByTicker[t], price, qty, cur)
 		}
 		p.historyStore.SetAll(all)
 	} else {
-		pps, qty := findPosition(positions, ticker)
-		ri := history.ComputeReturns(orders, divs, pps, qty)
+		price, qty, cur := findPosition(positions, ticker)
+		ri := history.ComputeReturns(orders, divs, price, qty, cur)
 		p.historyStore.Set(ticker, ri)
 	}
 }
 
-func findPosition(positions []api.Position, ticker string) (profitPerShare, quantity float64) {
+func findPosition(positions []api.Position, ticker string) (currentPrice, quantity float64, currency string) {
 	for _, p := range positions {
 		if p.Ticker == ticker {
-			return p.ProfitPerShare, p.Quantity
+			return p.CurrentPrice, p.Quantity, p.Currency
 		}
 	}
-	return 0, 0
+	return 0, 0, ""
 }
