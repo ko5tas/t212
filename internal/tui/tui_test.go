@@ -2,9 +2,11 @@ package tui_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ko5tas/t212/internal/api"
 	"github.com/ko5tas/t212/internal/tui"
 )
@@ -87,5 +89,82 @@ func TestModel_TimestampUpdated(t *testing.T) {
 	updated := m.ApplyMessage(b)
 	if !updated.LastUpdated().Equal(ts) {
 		t.Errorf("timestamp: got %v, want %v", updated.LastUpdated(), ts)
+	}
+}
+
+func TestModel_ViewShowsReturnColumns(t *testing.T) {
+	m := tui.NewModel()
+	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.08}
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{
+				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
+				AveragePrice: 173.20, CurrentPrice: 182.50,
+				ProfitPerShare: 9.30, MarketValue: 547.50,
+				Returns: ri,
+			},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	updated := m.ApplyMessage(b)
+	view := updated.View()
+
+	if !strings.Contains(view, "RETURN") {
+		t.Error("view should contain RETURN header")
+	}
+	if !strings.Contains(view, "42.30") {
+		t.Error("view should contain return value 42.30")
+	}
+	if !strings.Contains(view, "65.08") {
+		t.Error("view should contain NetROI value 65.08")
+	}
+}
+
+func TestModel_ViewShowsPlaceholderWhenNoReturns(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{
+				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
+				AveragePrice: 173.20, CurrentPrice: 182.50,
+				ProfitPerShare: 9.30, MarketValue: 547.50,
+			},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	updated := m.ApplyMessage(b)
+	view := updated.View()
+
+	if !strings.Contains(view, "--") {
+		t.Error("view should contain -- placeholder when Returns is nil")
+	}
+}
+
+func TestModel_CursorMovement(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{Ticker: "AAPL_US_EQ", ProfitPerShare: 5},
+			{Ticker: "MSFT_US_EQ", ProfitPerShare: 3},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	// Move down
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model := m2.(tui.Model)
+	if model.Cursor() != 1 {
+		t.Errorf("cursor should be 1 after j, got %d", model.Cursor())
+	}
+
+	// Move up
+	m3, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model2 := m3.(tui.Model)
+	if model2.Cursor() != 0 {
+		t.Errorf("cursor should be 0 after k, got %d", model2.Cursor())
 	}
 }

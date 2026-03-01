@@ -26,6 +26,8 @@ type Model struct {
 	positions []api.Position
 	updated   time.Time
 	err       error
+	conn      *websocket.Conn
+	cursor    int
 }
 
 // NewModel returns an empty Model.
@@ -38,6 +40,9 @@ func (m Model) Positions() []api.Position { return m.positions }
 
 // LastUpdated returns the timestamp of the last received message.
 func (m Model) LastUpdated() time.Time { return m.updated }
+
+// Cursor returns the current cursor position (row index).
+func (m Model) Cursor() int { return m.cursor }
 
 // ApplyMessage parses a raw WebSocket JSON message and returns an updated Model.
 // Invalid JSON is silently ignored (model unchanged).
@@ -66,8 +71,28 @@ func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch v := msg.(type) {
 	case tea.KeyMsg:
-		if v.String() == "q" || v.String() == "ctrl+c" {
+		switch v.String() {
+		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "r":
+			if m.conn != nil && len(m.positions) > 0 && m.cursor < len(m.positions) {
+				ticker := m.positions[m.cursor].Ticker
+				m.conn.WriteMessage(websocket.TextMessage,
+					[]byte(`{"action":"refresh","ticker":"`+ticker+`"}`))
+			}
+		case "R":
+			if m.conn != nil {
+				m.conn.WriteMessage(websocket.TextMessage,
+					[]byte(`{"action":"refresh_all"}`))
+			}
+		case "j", "down":
+			if m.cursor < len(m.positions)-1 {
+				m.cursor++
+			}
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
 		}
 	case msgReceived:
 		m = m.ApplyMessage(v)
@@ -92,23 +117,38 @@ func (m Model) View() string {
 	}
 
 	out := titleStyle.Render("T212 Dashboard") + "\n"
-	out += dimStyle.Render("Positions with profit > 1/share  [q: quit]") + "\n\n"
+	out += dimStyle.Render("Positions with profit > 1/share  [r: refresh stock | R: refresh all | j/k: navigate | q: quit]") + "\n\n"
 
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions above threshold") + "\n"
 	} else {
-		out += fmt.Sprintf("%-20s %10s %12s %13s %14s %14s\n",
+		out += fmt.Sprintf("  %-20s %10s %10s %10s %10s %12s %13s %14s %14s\n",
 			headerStyle.Render("TICKER"),
+			headerStyle.Render("RETURN"),
+			headerStyle.Render("RETURN %"),
+			headerStyle.Render("NET ROI %"),
 			headerStyle.Render("QTY"),
 			headerStyle.Render("AVG PRICE"),
 			headerStyle.Render("CURR PRICE"),
 			headerStyle.Render("PROFIT/SHR"),
 			headerStyle.Render("MKT VALUE"),
 		)
-		for _, p := range m.positions {
+		for i, p := range m.positions {
 			sym := p.CurrencySymbol()
-			out += fmt.Sprintf("%-20s %10.4f %s%11.2f %s%12.2f %s %s%13.2f\n",
-				p.Ticker, p.Quantity,
+			marker := "  "
+			if i == m.cursor {
+				marker = "> "
+			}
+			retStr := fmt.Sprintf("%10s %10s %10s", "--", "--", "--")
+			if p.Returns != nil {
+				retStr = fmt.Sprintf("%10.2f %9.2f%% %9.2f%%",
+					p.Returns.Return, p.Returns.ReturnPct, p.Returns.NetROIPct)
+			}
+			out += fmt.Sprintf("%s%-20s %s %10.4f %s%11.2f %s%12.2f %s %s%13.2f\n",
+				marker,
+				p.Ticker,
+				retStr,
+				p.Quantity,
 				sym, p.AveragePrice,
 				sym, p.CurrentPrice,
 				profitStyle.Render(fmt.Sprintf("%s%+12.2f", sym, p.ProfitPerShare)),
@@ -133,6 +173,7 @@ func Run(ctx context.Context, wsURL string) error {
 	defer conn.Close()
 
 	m := NewModel()
+	m.conn = conn
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	go func() {
