@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -60,14 +61,13 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 		return nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	// The T212 API wire format nests the ticker and currencyCode inside an
-	// "instrument" object and uses "averagePricePaid" for the average price.
-	// UK instruments have currencyCode "GBX" (pence); prices are divided by 100
-	// to normalise to GBP before storing.
+	// The T212 API wire format nests the ticker inside an "instrument" object
+	// and uses "averagePricePaid" for the average price.
+	// UK/LSE instruments (ticker ending in _EQ without a country code) are
+	// priced in GBX (pence); prices are divided by 100 to normalise to GBP.
 	type wirePosition struct {
 		Instrument struct {
-			Ticker       string `json:"ticker"`
-			CurrencyCode string `json:"currencyCode"`
+			Ticker string `json:"ticker"`
 		} `json:"instrument"`
 		Quantity     float64 `json:"quantity"`
 		AveragePrice float64 `json:"averagePricePaid"`
@@ -82,7 +82,7 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 	for i, r := range raw {
 		avg := r.AveragePrice
 		curr := r.CurrentPrice
-		currency := r.Instrument.CurrencyCode
+		currency := inferCurrency(r.Instrument.Ticker)
 		if currency == "GBX" {
 			avg /= 100
 			curr /= 100
@@ -100,6 +100,30 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 
 	rl := parseRateLimit(resp)
 	return positions, rl, nil
+}
+
+// inferCurrency determines the currency from a T212 ticker suffix.
+// UK/LSE tickers use the pattern SYMBOL_EQ and are priced in GBX (pence).
+// Other exchanges include a 2-letter country code: SYMBOL_US_EQ (USD), etc.
+func inferCurrency(ticker string) string {
+	if !strings.HasSuffix(ticker, "_EQ") {
+		return ""
+	}
+	base := strings.TrimSuffix(ticker, "_EQ")
+	if i := strings.LastIndex(base, "_"); i >= 0 {
+		cc := base[i+1:]
+		if len(cc) == 2 {
+			switch cc {
+			case "US":
+				return "USD"
+			case "DE", "FR", "NL":
+				return "EUR"
+			}
+			return ""
+		}
+	}
+	// No country code before _EQ → UK/LSE → GBX
+	return "GBX"
 }
 
 func parseRateLimit(resp *http.Response) RateLimitInfo {

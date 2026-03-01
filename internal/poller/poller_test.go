@@ -18,13 +18,13 @@ import (
 )
 
 // t212Wire converts a Position slice to the T212 API wire format for mock servers.
-// The wire format nests the ticker and currencyCode inside an "instrument" object
-// and uses "averagePricePaid".
+// The wire format nests the ticker inside an "instrument" object and uses "averagePricePaid".
+// Currency is inferred from the ticker suffix by the client.
 func t212Wire(positions []api.Position) []map[string]any {
 	out := make([]map[string]any, len(positions))
 	for i, p := range positions {
 		out[i] = map[string]any{
-			"instrument":       map[string]any{"ticker": p.Ticker, "currencyCode": p.Currency},
+			"instrument":       map[string]any{"ticker": p.Ticker},
 			"quantity":         p.Quantity,
 			"averagePricePaid": p.AveragePrice,
 			"currentPrice":     p.CurrentPrice,
