@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/ko5tas/t212/internal/api"
+	"github.com/ko5tas/t212/internal/history"
 	"github.com/ko5tas/t212/internal/hub"
 	"github.com/ko5tas/t212/internal/notifier"
 	"github.com/ko5tas/t212/internal/poller"
@@ -49,13 +50,19 @@ func runServe() error {
 	s := store.New()
 	h := hub.New()
 
+	hs := history.NewStore()
+	refreshCh := make(chan string, 8)
+
 	var n poller.Notifier
 	if signalNumber != "" {
 		n = notifier.New(signalCLIPath, signalNumber)
 	}
 
-	p := poller.New(apiClient, s, h, threshold, n)
-	srv := server.New(h, ":"+port)
+	p := poller.New(apiClient, s, h, threshold, n,
+		poller.WithHistoryStore(hs),
+		poller.WithRefreshChan(refreshCh),
+	)
+	srv := server.New(h, ":"+port, server.WithRefreshChan(refreshCh))
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
