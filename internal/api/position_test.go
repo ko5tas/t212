@@ -54,3 +54,24 @@ func TestPosition_Computed(t *testing.T) {
 		t.Errorf("MarketValue: got %v, want ~%v", p.MarketValue, wantMV)
 	}
 }
+
+func TestPosition_ReturnsNilByDefault(t *testing.T) {
+	p := api.Position{Ticker: "AAPL_US_EQ"}
+	if p.Returns != nil {
+		t.Error("Returns should be nil by default")
+	}
+}
+
+func TestPosition_ReturnsInJSON(t *testing.T) {
+	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.08}
+	p := api.Position{Ticker: "AAPL_US_EQ", Returns: ri}
+	b, _ := json.Marshal(p)
+	var got api.Position
+	json.Unmarshal(b, &got)
+	if got.Returns == nil {
+		t.Fatal("Returns should not be nil after unmarshal")
+	}
+	if got.Returns.Return != 42.30 {
+		t.Errorf("Return: got %v, want 42.30", got.Returns.Return)
+	}
+}

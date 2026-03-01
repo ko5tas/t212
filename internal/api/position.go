@@ -9,7 +9,8 @@ type Position struct {
 	AveragePrice   float64 `json:"averagePrice"`
 	CurrentPrice   float64 `json:"currentPrice"`
 	ProfitPerShare float64 `json:"profitPerShare"`
-	MarketValue    float64 `json:"marketValue"`
+	MarketValue    float64     `json:"marketValue"`
+	Returns        *ReturnInfo `json:"returns,omitempty"`
 }
 
 // CurrencySymbol returns the display symbol for the position's currency.
