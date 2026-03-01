@@ -122,8 +122,8 @@ func (p *Poller) poll(ctx context.Context) {
 
 	filtered := filter.Apply(positions, p.threshold)
 	p.sendNotifications(filtered)
-	p.attachReturns(filtered)
-	p.broadcast(filtered)
+	p.attachReturns(positions)
+	p.broadcast(positions)
 }
 
 func (p *Poller) broadcast(filtered []api.Position) {

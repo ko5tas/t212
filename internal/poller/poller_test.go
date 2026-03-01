@@ -76,10 +76,10 @@ func TestPoller_PollsAndStores(t *testing.T) {
 	t.Fatal("store was not populated within 2 seconds")
 }
 
-func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
+func TestPoller_BroadcastsAllPositions(t *testing.T) {
 	positions := []api.Position{
 		{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50}, // profit 9.30 > 1
-		{Ticker: "TSLA_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 200.00, CurrentPrice: 199.00}, // loss — filtered out
+		{Ticker: "TSLA_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 200.00, CurrentPrice: 199.00}, // loss
 	}
 	var callCount atomic.Int32
 	srv := makeServer(t, positions, &callCount)
@@ -104,11 +104,8 @@ func TestPoller_BroadcastsFilteredPositions(t *testing.T) {
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			t.Fatalf("unmarshal broadcast: %v", err)
 		}
-		if len(payload.Positions) != 1 {
-			t.Fatalf("broadcast should contain 1 filtered position, got %d", len(payload.Positions))
-		}
-		if payload.Positions[0].Ticker != "AAPL_US_EQ" {
-			t.Errorf("expected AAPL, got %q", payload.Positions[0].Ticker)
+		if len(payload.Positions) != 2 {
+			t.Fatalf("broadcast should contain all 2 positions, got %d", len(payload.Positions))
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for broadcast")

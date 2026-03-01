@@ -14,20 +14,20 @@
     <span id="updated"></span>
   </header>
   <main>
-    <p id="empty" class="empty hidden">No positions with profit &gt; £1/share</p>
+    <p id="empty" class="empty hidden">No positions</p>
     <table id="positions" class="hidden">
       <thead>
         <tr>
-          <th>Ticker</th>
+          <th data-col="ticker">Ticker</th>
           <th></th>
-          <th>Return</th>
-          <th>Return %</th>
-          <th>Net ROI %</th>
-          <th>Quantity</th>
-          <th>Avg Price</th>
-          <th>Current Price</th>
-          <th>Profit/Share</th>
-          <th>Market Value</th>
+          <th data-col="return">Return</th>
+          <th data-col="returnPct">Return %</th>
+          <th data-col="netRoi">Net ROI %</th>
+          <th data-col="quantity">Quantity</th>
+          <th data-col="currentPrice">Current Price</th>
+          <th data-col="averagePrice">Avg Price</th>
+          <th data-col="profitPerShare">Profit/Share</th>
+          <th data-col="marketValue">Market Value</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>

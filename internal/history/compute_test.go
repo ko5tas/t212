@@ -30,15 +30,17 @@ func TestComputeReturns_BuysAndSells(t *testing.T) {
 	if !approx(ri.TotalDividends, 7.30) {
 		t.Errorf("TotalDividends: got %v, want 7.30", ri.TotalDividends)
 	}
-	if !approx(ri.Return, 42.30) {
-		t.Errorf("Return: got %v, want 42.30", ri.Return)
+	// Return = sold + dividends - bought = 35 + 7.30 - 100 = -57.70
+	if !approx(ri.Return, -57.70) {
+		t.Errorf("Return: got %v, want -57.70", ri.Return)
 	}
-	if !approx(ri.ReturnPct, 42.30) {
-		t.Errorf("ReturnPct: got %v, want 42.30", ri.ReturnPct)
+	// ReturnPct = -57.70 / 100 * 100 = -57.70
+	if !approx(ri.ReturnPct, -57.70) {
+		t.Errorf("ReturnPct: got %v, want -57.70", ri.ReturnPct)
 	}
-	// NetROIPct = (42.30 + 7.50) / (100.0 - 35.0) * 100 = 49.80 / 65.0 * 100 = 76.62
-	if !approx(ri.NetROIPct, 76.62) {
-		t.Errorf("NetROIPct: got %v, want ~76.62", ri.NetROIPct)
+	// NetROIPct = (-57.70 + 7.50) / 100 * 100 = -50.20
+	if !approx(ri.NetROIPct, -50.20) {
+		t.Errorf("NetROIPct: got %v, want ~-50.20", ri.NetROIPct)
 	}
 }
 
@@ -53,8 +55,9 @@ func TestComputeReturns_OnlyDividends(t *testing.T) {
 	orders := []api.HistoricalOrder{makeOrder("BUY", 200.0)}
 	divs := []api.DividendItem{{Amount: 10.0}}
 	ri := history.ComputeReturns(orders, divs, 5.0, 2.0)
-	if !approx(ri.Return, 10.0) {
-		t.Errorf("Return: got %v, want 10.0", ri.Return)
+	// Return = 0 (sold) + 10 (divs) - 200 (bought) = -190
+	if !approx(ri.Return, -190.0) {
+		t.Errorf("Return: got %v, want -190.0", ri.Return)
 	}
 }
 

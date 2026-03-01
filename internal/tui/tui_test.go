@@ -142,6 +142,48 @@ func TestModel_ViewShowsPlaceholderWhenNoReturns(t *testing.T) {
 	}
 }
 
+func TestModel_ViewEmptyMessage(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{},
+	}
+	b, _ := json.Marshal(payload)
+	updated := m.ApplyMessage(b)
+	view := updated.View()
+
+	if !strings.Contains(view, "No positions") {
+		t.Error("view should show 'No positions' when empty")
+	}
+}
+
+func TestModel_ViewColumnOrder(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{
+				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
+				AveragePrice: 173.20, CurrentPrice: 182.50,
+				ProfitPerShare: 9.30, MarketValue: 547.50,
+			},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	updated := m.ApplyMessage(b)
+	view := updated.View()
+
+	// Current Price should appear before Avg Price in the header
+	currIdx := strings.Index(view, "CURR PRICE")
+	avgIdx := strings.Index(view, "AVG PRICE")
+	if currIdx < 0 || avgIdx < 0 {
+		t.Fatal("view should contain both CURR PRICE and AVG PRICE headers")
+	}
+	if currIdx > avgIdx {
+		t.Error("CURR PRICE should appear before AVG PRICE")
+	}
+}
+
 func TestModel_CursorMovement(t *testing.T) {
 	m := tui.NewModel()
 	payload := tui.WSMessage{
@@ -166,5 +208,79 @@ func TestModel_CursorMovement(t *testing.T) {
 	model2 := m3.(tui.Model)
 	if model2.Cursor() != 0 {
 		t.Errorf("cursor should be 0 after k, got %d", model2.Cursor())
+	}
+}
+
+func TestModel_SortCycleColumn(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{Ticker: "AAPL_US_EQ", ProfitPerShare: 5, Quantity: 10},
+			{Ticker: "MSFT_US_EQ", ProfitPerShare: 3, Quantity: 20},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	// Default sort is ProfitPerShare desc
+	if m.SortCol() != tui.SortProfitPerShare {
+		t.Errorf("default sort column should be ProfitPerShare, got %v", m.SortCol())
+	}
+
+	// Press 's' to cycle to next column
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	model := m2.(tui.Model)
+	if model.SortCol() != tui.SortMarketValue {
+		t.Errorf("sort column after s should be MarketValue, got %v", model.SortCol())
+	}
+}
+
+func TestModel_SortToggleDirection(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{Ticker: "AAPL_US_EQ", ProfitPerShare: 5},
+			{Ticker: "MSFT_US_EQ", ProfitPerShare: 3},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	// Default: desc
+	if m.SortAsc() {
+		t.Error("default sort should be descending")
+	}
+
+	// Press 'S' to toggle to ascending
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	model := m2.(tui.Model)
+	if !model.SortAsc() {
+		t.Error("sort should be ascending after S")
+	}
+
+	// Positions should now be in ascending order (3 before 5)
+	if model.Positions()[0].ProfitPerShare != 3 {
+		t.Errorf("ascending sort: first position should have ProfitPerShare=3, got %v",
+			model.Positions()[0].ProfitPerShare)
+	}
+}
+
+func TestModel_SortIndicatorInView(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{Ticker: "AAPL_US_EQ", ProfitPerShare: 5},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+	view := m.View()
+
+	// Default sort column (ProfitPerShare) should have a sort indicator
+	if !strings.Contains(view, "▼") {
+		t.Error("view should contain ▼ indicator for default desc sort")
 	}
 }

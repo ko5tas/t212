@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,6 +21,47 @@ type WSMessage struct {
 	Positions []api.Position `json:"positions"`
 }
 
+// SortColumn identifies which column the table is sorted by.
+type SortColumn int
+
+const (
+	SortTicker SortColumn = iota
+	SortReturn
+	SortReturnPct
+	SortNetROI
+	SortQuantity
+	SortCurrentPrice
+	SortAvgPrice
+	SortProfitPerShare
+	SortMarketValue
+	sortColumnCount // sentinel
+)
+
+// String returns the column header name.
+func (s SortColumn) String() string {
+	switch s {
+	case SortTicker:
+		return "TICKER"
+	case SortReturn:
+		return "RETURN"
+	case SortReturnPct:
+		return "RETURN %"
+	case SortNetROI:
+		return "NET ROI %"
+	case SortQuantity:
+		return "QTY"
+	case SortCurrentPrice:
+		return "CURR PRICE"
+	case SortAvgPrice:
+		return "AVG PRICE"
+	case SortProfitPerShare:
+		return "PROFIT/SHR"
+	case SortMarketValue:
+		return "MKT VALUE"
+	}
+	return ""
+}
+
 // Model is the bubbletea model. All state transitions happen via ApplyMessage
 // so they are testable without bubbletea I/O.
 type Model struct {
@@ -28,14 +70,16 @@ type Model struct {
 	err       error
 	conn      *websocket.Conn
 	cursor    int
+	sortCol   SortColumn
+	sortAsc   bool
 }
 
 // NewModel returns an empty Model.
 func NewModel() Model {
-	return Model{positions: []api.Position{}}
+	return Model{positions: []api.Position{}, sortCol: SortProfitPerShare}
 }
 
-// Positions returns the current filtered positions.
+// Positions returns the current positions.
 func (m Model) Positions() []api.Position { return m.positions }
 
 // LastUpdated returns the timestamp of the last received message.
@@ -43,6 +87,12 @@ func (m Model) LastUpdated() time.Time { return m.updated }
 
 // Cursor returns the current cursor position (row index).
 func (m Model) Cursor() int { return m.cursor }
+
+// SortCol returns the current sort column.
+func (m Model) SortCol() SortColumn { return m.sortCol }
+
+// SortAsc returns whether sorting is ascending.
+func (m Model) SortAsc() bool { return m.sortAsc }
 
 // ApplyMessage parses a raw WebSocket JSON message and returns an updated Model.
 // Invalid JSON is silently ignored (model unchanged).
@@ -56,6 +106,7 @@ func (m Model) ApplyMessage(raw []byte) Model {
 	}
 	m.positions = msg.Positions
 	m.updated = msg.Timestamp
+	m.sortPositions()
 	return m
 }
 
@@ -93,6 +144,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			}
+		case "s":
+			m.sortCol = (m.sortCol + 1) % sortColumnCount
+			m.sortAsc = false
+			m.sortPositions()
+		case "S":
+			m.sortAsc = !m.sortAsc
+			m.sortPositions()
 		}
 	case msgReceived:
 		m = m.ApplyMessage(v)
@@ -103,12 +161,82 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) sortPositions() {
+	col := m.sortCol
+	asc := m.sortAsc
+	sort.SliceStable(m.positions, func(i, j int) bool {
+		less := posLess(m.positions[i], m.positions[j], col)
+		if asc {
+			return less
+		}
+		return !less
+	})
+}
+
+func returnVal(p api.Position) float64 {
+	if p.Returns == nil {
+		return 0
+	}
+	return p.Returns.Return
+}
+
+func returnPctVal(p api.Position) float64 {
+	if p.Returns == nil {
+		return 0
+	}
+	return p.Returns.ReturnPct
+}
+
+func netROIVal(p api.Position) float64 {
+	if p.Returns == nil {
+		return 0
+	}
+	return p.Returns.NetROIPct
+}
+
+func posLess(a, b api.Position, col SortColumn) bool {
+	switch col {
+	case SortTicker:
+		return a.Ticker < b.Ticker
+	case SortReturn:
+		return returnVal(a) < returnVal(b)
+	case SortReturnPct:
+		return returnPctVal(a) < returnPctVal(b)
+	case SortNetROI:
+		return netROIVal(a) < netROIVal(b)
+	case SortQuantity:
+		return a.Quantity < b.Quantity
+	case SortCurrentPrice:
+		return a.CurrentPrice < b.CurrentPrice
+	case SortAvgPrice:
+		return a.AveragePrice < b.AveragePrice
+	case SortProfitPerShare:
+		return a.ProfitPerShare < b.ProfitPerShare
+	case SortMarketValue:
+		return a.MarketValue < b.MarketValue
+	}
+	return false
+}
+
 var (
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
 	profitStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ade80")).Bold(true)
+	lossStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#f87171")).Bold(true)
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e2e8f0"))
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#475569"))
 )
+
+func (m Model) renderHeader(name string, col SortColumn) string {
+	indicator := ""
+	if m.sortCol == col {
+		if m.sortAsc {
+			indicator = " ▲"
+		} else {
+			indicator = " ▼"
+		}
+	}
+	return headerStyle.Render(name + indicator)
+}
 
 // View renders the TUI.
 func (m Model) View() string {
@@ -117,21 +245,21 @@ func (m Model) View() string {
 	}
 
 	out := titleStyle.Render("T212 Dashboard") + "\n"
-	out += dimStyle.Render("Positions with profit > 1/share  [r: refresh stock | R: refresh all | j/k: navigate | q: quit]") + "\n\n"
+	out += dimStyle.Render("[r: refresh stock | R: refresh all | j/k: navigate | s/S: sort | q: quit]") + "\n\n"
 
 	if len(m.positions) == 0 {
-		out += dimStyle.Render("No positions above threshold") + "\n"
+		out += dimStyle.Render("No positions") + "\n"
 	} else {
-		out += fmt.Sprintf("  %-20s %10s %10s %10s %10s %12s %13s %14s %14s\n",
-			headerStyle.Render("TICKER"),
-			headerStyle.Render("RETURN"),
-			headerStyle.Render("RETURN %"),
-			headerStyle.Render("NET ROI %"),
-			headerStyle.Render("QTY"),
-			headerStyle.Render("AVG PRICE"),
-			headerStyle.Render("CURR PRICE"),
-			headerStyle.Render("PROFIT/SHR"),
-			headerStyle.Render("MKT VALUE"),
+		out += fmt.Sprintf("  %-20s %10s %10s %10s %10s %13s %12s %14s %14s\n",
+			m.renderHeader("TICKER", SortTicker),
+			m.renderHeader("RETURN", SortReturn),
+			m.renderHeader("RETURN %", SortReturnPct),
+			m.renderHeader("NET ROI %", SortNetROI),
+			m.renderHeader("QTY", SortQuantity),
+			m.renderHeader("CURR PRICE", SortCurrentPrice),
+			m.renderHeader("AVG PRICE", SortAvgPrice),
+			m.renderHeader("PROFIT/SHR", SortProfitPerShare),
+			m.renderHeader("MKT VALUE", SortMarketValue),
 		)
 		for i, p := range m.positions {
 			sym := p.CurrencySymbol()
@@ -144,14 +272,20 @@ func (m Model) View() string {
 				retStr = fmt.Sprintf("%10.2f %9.2f%% %9.2f%%",
 					p.Returns.Return, p.Returns.ReturnPct, p.Returns.NetROIPct)
 			}
-			out += fmt.Sprintf("%s%-20s %s %10.4f %s%11.2f %s%12.2f %s %s%13.2f\n",
+			ppsStr := fmt.Sprintf("%s%+12.2f", sym, p.ProfitPerShare)
+			if p.ProfitPerShare >= 0 {
+				ppsStr = profitStyle.Render(ppsStr)
+			} else {
+				ppsStr = lossStyle.Render(ppsStr)
+			}
+			out += fmt.Sprintf("%s%-20s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
 				marker,
 				p.Ticker,
 				retStr,
 				p.Quantity,
-				sym, p.AveragePrice,
 				sym, p.CurrentPrice,
-				profitStyle.Render(fmt.Sprintf("%s%+12.2f", sym, p.ProfitPerShare)),
+				sym, p.AveragePrice,
+				ppsStr,
 				sym, p.MarketValue,
 			)
 		}
