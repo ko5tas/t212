@@ -78,6 +78,9 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 		Quantity     float64 `json:"quantity"`
 		AveragePrice float64 `json:"averagePricePaid"`
 		CurrentPrice float64 `json:"currentPrice"`
+		WalletImpact struct {
+			CurrentValue float64 `json:"currentValue"`
+		} `json:"walletImpact"`
 	}
 	var raw []wirePosition
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
@@ -95,11 +98,12 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 			currency = "GBP"
 		}
 		positions[i] = Position{
-			Ticker:       r.Instrument.Ticker,
-			Currency:     currency,
-			Quantity:     r.Quantity,
-			AveragePrice: avg,
-			CurrentPrice: curr,
+			Ticker:          r.Instrument.Ticker,
+			Currency:        currency,
+			Quantity:        r.Quantity,
+			AveragePrice:    avg,
+			CurrentPrice:    curr,
+			CurrentValueGBP: r.WalletImpact.CurrentValue,
 		}
 		positions[i].Compute()
 	}

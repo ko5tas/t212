@@ -13,16 +13,16 @@ func approx(a, b float64) bool {
 }
 
 // GBP stock: buy £100 for 10 shares at £10 each, sell 3 shares for £35,
-// dividends £7.30. Still hold 7 shares, current price £12.
+// dividends £7.30. Still hold 7 shares, currentValueGBP = £84 (12*7).
 func TestComputeReturns_GBP_BuysAndSells(t *testing.T) {
 	orders := []api.HistoricalOrder{
-		makeOrderFull("BUY", 100.0, 10.0, 7, "FILLED"),  // £100 for 10 shares @ £10
-		makeOrderFull("SELL", 35.0, 11.67, 3, "FILLED"),  // sold 3 shares for £35
+		makeOrder("BUY", 100.0, 10),  // £100 for 10 shares
+		makeOrder("SELL", 35.0, 3),   // sold 3 shares for £35
 	}
 	divs := []api.DividendItem{{Amount: 7.30}}
 
-	// current price £12, 7 shares remaining, GBP stock
-	ri := history.ComputeReturns(orders, divs, 12.0, 7.0, "GBP")
+	// currentValueGBP = 84 (from T212 walletImpact.currentValue)
+	ri := history.ComputeReturns(orders, divs, 84.0)
 
 	if !approx(ri.TotalBought, 100.0) {
 		t.Errorf("TotalBought: got %v, want 100.0", ri.TotalBought)
@@ -33,7 +33,6 @@ func TestComputeReturns_GBP_BuysAndSells(t *testing.T) {
 	if !approx(ri.TotalDividends, 7.30) {
 		t.Errorf("TotalDividends: got %v, want 7.30", ri.TotalDividends)
 	}
-	// currentValueGBP = 12 * 7 = 84
 	// Return = 84 + 35 + 7.30 - 100 = 26.30
 	if !approx(ri.Return, 26.30) {
 		t.Errorf("Return: got %v, want 26.30", ri.Return)
@@ -44,37 +43,36 @@ func TestComputeReturns_GBP_BuysAndSells(t *testing.T) {
 	}
 }
 
-// USD stock: buy 3.39 shares at $39.17 for £100, no sales/dividends,
-// current price $18.87.  Matches the user's USAR example.
+// USD stock: buy 3.39 shares for £100. T212 says current GBP value = £47.53.
+// Matches the user's USAR example exactly.
 func TestComputeReturns_USD_UnrealisedLoss(t *testing.T) {
 	orders := []api.HistoricalOrder{
-		makeOrderFull("BUY", 100.0, 39.17, 3.39421173, "FILLED"),
+		makeOrder("BUY", 100.0, 3.39421173),
 	}
 
-	ri := history.ComputeReturns(orders, nil, 18.87, 3.39421173, "USD")
+	// currentValueGBP = 47.53 (from T212 walletImpact, includes FX + fees)
+	ri := history.ComputeReturns(orders, nil, 47.53)
 
-	// impliedRate = (39.17 * 3.39421173) / 100 ≈ 1.3290
-	// currentValueGBP = (18.87 * 3.39421173) / 1.3290 ≈ 48.19
-	// Return ≈ 48.19 + 0 + 0 - 100 ≈ -51.81
-	// (User sees £47.53 because live FX differs; implied rate is an approximation.)
-	if ri.Return > -45 || ri.Return < -60 {
-		t.Errorf("Return: got %v, want roughly -48 to -52", ri.Return)
+	// Return = 47.53 + 0 + 0 - 100 = -52.47
+	if !approx(ri.Return, -52.47) {
+		t.Errorf("Return: got %v, want -52.47", ri.Return)
 	}
-	if ri.ReturnPct > -45 || ri.ReturnPct < -60 {
-		t.Errorf("ReturnPct: got %v, want roughly -48%% to -52%%", ri.ReturnPct)
+	// ReturnPct = -52.47 / 100 * 100 = -52.47
+	if !approx(ri.ReturnPct, -52.47) {
+		t.Errorf("ReturnPct: got %v, want -52.47%%", ri.ReturnPct)
 	}
 }
 
 // All shares sold — purely realised.
 func TestComputeReturns_AllSold(t *testing.T) {
 	orders := []api.HistoricalOrder{
-		makeOrderFull("BUY", 100.0, 50.0, 2, "FILLED"),
-		makeOrderFull("SELL", 120.0, 60.0, 2, "FILLED"),
+		makeOrder("BUY", 100.0, 2),
+		makeOrder("SELL", 120.0, 2),
 	}
 
-	ri := history.ComputeReturns(orders, nil, 0, 0, "GBP")
+	// currentValueGBP = 0 (no shares held)
+	ri := history.ComputeReturns(orders, nil, 0)
 
-	// currentValueGBP = 0 (no shares)
 	// Return = 0 + 120 + 0 - 100 = 20
 	if !approx(ri.Return, 20.0) {
 		t.Errorf("Return: got %v, want 20.0", ri.Return)
@@ -85,7 +83,7 @@ func TestComputeReturns_AllSold(t *testing.T) {
 }
 
 func TestComputeReturns_NoBuys(t *testing.T) {
-	ri := history.ComputeReturns(nil, nil, 0, 0, "GBP")
+	ri := history.ComputeReturns(nil, nil, 0)
 	if ri.ReturnPct != 0 {
 		t.Errorf("ReturnPct should be 0 with no buys, got %v", ri.ReturnPct)
 	}
@@ -93,37 +91,34 @@ func TestComputeReturns_NoBuys(t *testing.T) {
 
 func TestComputeReturns_OnlyDividends(t *testing.T) {
 	orders := []api.HistoricalOrder{
-		makeOrderFull("BUY", 200.0, 100.0, 2, "FILLED"),
+		makeOrder("BUY", 200.0, 2),
 	}
 	divs := []api.DividendItem{{Amount: 10.0}}
 
-	// current price £105, 2 shares, GBP
-	ri := history.ComputeReturns(orders, divs, 105.0, 2.0, "GBP")
+	// currentValueGBP = 210 (from T212 walletImpact)
+	ri := history.ComputeReturns(orders, divs, 210.0)
 
-	// currentValueGBP = 105 * 2 = 210
 	// Return = 210 + 0 + 10 - 200 = 20
 	if !approx(ri.Return, 20.0) {
 		t.Errorf("Return: got %v, want 20.0", ri.Return)
 	}
 }
 
-func TestComputeReturns_SkipsNonFilled(t *testing.T) {
+func TestComputeReturns_SkipsZeroQuantityFills(t *testing.T) {
 	orders := []api.HistoricalOrder{
-		makeOrderFull("BUY", 100.0, 50.0, 2, "FILLED"),
-		makeOrderFull("SELL", 50.0, 50.0, 1, "CANCELLED"),
+		makeOrder("BUY", 100.0, 2),
+		makeOrder("SELL", 50.0, 0), // zero fill qty — not a real fill
 	}
-	ri := history.ComputeReturns(orders, nil, 50.0, 2, "GBP")
+	ri := history.ComputeReturns(orders, nil, 100.0)
 	if ri.TotalSold != 0 {
-		t.Errorf("cancelled sell should be ignored, got TotalSold=%v", ri.TotalSold)
+		t.Errorf("zero-quantity fill should be ignored, got TotalSold=%v", ri.TotalSold)
 	}
 }
 
-func makeOrderFull(side string, netValue, fillPrice, fillQty float64, status string) api.HistoricalOrder {
+func makeOrder(side string, netValue, fillQty float64) api.HistoricalOrder {
 	var o api.HistoricalOrder
 	o.Order.Side = side
-	o.Order.Status = status
 	o.Fill.Impact.NetValue = netValue
-	o.Fill.Price = fillPrice
 	o.Fill.Quantity = fillQty
 	return o
 }

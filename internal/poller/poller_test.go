@@ -29,6 +29,7 @@ func t212Wire(positions []api.Position) []map[string]any {
 			"quantity":         p.Quantity,
 			"averagePricePaid": p.AveragePrice,
 			"currentPrice":     p.CurrentPrice,
+			"walletImpact":     map[string]any{"currentValue": p.CurrentValueGBP},
 		}
 	}
 	return out

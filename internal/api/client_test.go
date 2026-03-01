@@ -21,7 +21,13 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 		w.Header().Set("x-ratelimit-remaining", "59")
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"instrument": map[string]any{"ticker": "AAPL_US_EQ"}, "quantity": 3.0, "averagePricePaid": 173.20, "currentPrice": 182.50}, // T212 wire format
+			{
+				"instrument":       map[string]any{"ticker": "AAPL_US_EQ"},
+				"quantity":         3.0,
+				"averagePricePaid": 173.20,
+				"currentPrice":    182.50,
+				"walletImpact":    map[string]any{"currentValue": 412.05},
+			},
 		})
 	}))
 	defer srv.Close()
@@ -39,6 +45,9 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 	}
 	if positions[0].Currency != "USD" {
 		t.Errorf("currency: got %q, want USD", positions[0].Currency)
+	}
+	if positions[0].CurrentValueGBP != 412.05 {
+		t.Errorf("CurrentValueGBP: got %v, want 412.05", positions[0].CurrentValueGBP)
 	}
 	if rl.Remaining != 59 {
 		t.Errorf("ratelimit remaining: got %d, want 59", rl.Remaining)
@@ -89,8 +98,9 @@ func TestClient_FetchPositions_GBXConversion(t *testing.T) {
 			{
 				"instrument":       map[string]any{"ticker": "LLOY_EQ"},
 				"quantity":         1000.0,
-				"averagePricePaid": 5500.0, // 5500 GBX = £55.00
-				"currentPrice":     5612.0, // 5612 GBX = £56.12
+				"averagePricePaid": 5500.0,  // 5500 GBX = £55.00
+				"currentPrice":     5612.0,  // 5612 GBX = £56.12
+				"walletImpact":     map[string]any{"currentValue": 56120.0},
 			},
 		})
 	}))
