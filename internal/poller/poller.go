@@ -73,11 +73,16 @@ func NewForTesting(client *api.Client, s *store.Store, h *hub.Hub, threshold flo
 
 // Run starts the polling loop. Blocks until ctx is cancelled.
 // An immediate poll is performed before waiting for the first tick.
+// History is fetched in the background so positions appear immediately.
 func (p *Poller) Run(ctx context.Context) {
-	if p.historyStore != nil {
-		p.refreshHistory(ctx, "")
-	}
 	p.poll(ctx)
+
+	if p.historyStore != nil {
+		go func() {
+			p.refreshHistory(ctx, "")
+			p.poll(ctx) // re-broadcast with returns attached
+		}()
+	}
 
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
