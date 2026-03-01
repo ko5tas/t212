@@ -134,6 +134,8 @@ func TestClient_FetchOrderHistory(t *testing.T) {
 		if r.URL.Path != "/api/v0/equity/history/orders" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		w.Header().Set("x-ratelimit-remaining", "5")
+		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Minute).Unix(), 10))
 		page++
 		if page == 1 {
 			next := "/api/v0/equity/history/orders?cursor=123&limit=50"

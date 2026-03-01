@@ -150,7 +150,7 @@ func (c *Client) FetchOrderHistory(ctx context.Context, ticker string) ([]Histor
 	}
 	var all []HistoricalOrder
 	for {
-		page, nextPath, err := fetchHistoryPage[HistoricalOrder](c, ctx, path)
+		page, nextPath, rl, err := fetchHistoryPage[HistoricalOrder](c, ctx, path)
 		if err != nil {
 			return nil, fmt.Errorf("fetch order history: %w", err)
 		}
@@ -159,10 +159,8 @@ func (c *Client) FetchOrderHistory(ctx context.Context, ticker string) ([]Histor
 			break
 		}
 		path = *nextPath
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(historyRateDelay):
+		if err := rateLimitWait(ctx, rl); err != nil {
+			return nil, err
 		}
 	}
 	return all, nil
@@ -177,7 +175,7 @@ func (c *Client) FetchDividendHistory(ctx context.Context, ticker string) ([]Div
 	}
 	var all []DividendItem
 	for {
-		page, nextPath, err := fetchHistoryPage[DividendItem](c, ctx, path)
+		page, nextPath, rl, err := fetchHistoryPage[DividendItem](c, ctx, path)
 		if err != nil {
 			return nil, fmt.Errorf("fetch dividend history: %w", err)
 		}
@@ -186,35 +184,59 @@ func (c *Client) FetchDividendHistory(ctx context.Context, ticker string) ([]Div
 			break
 		}
 		path = *nextPath
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(historyRateDelay):
+		if err := rateLimitWait(ctx, rl); err != nil {
+			return nil, err
 		}
 	}
 	return all, nil
 }
 
-func fetchHistoryPage[T any](c *Client, ctx context.Context, path string) ([]T, *string, error) {
+// rateLimitWait sleeps only when the rate limit is nearly exhausted.
+// If remaining > 1 or no rate limit headers were present, proceeds immediately.
+// Otherwise waits until the reset time (capped at historyRateDelay).
+func rateLimitWait(ctx context.Context, rl RateLimitInfo) error {
+	if rl.Remaining > 1 {
+		return nil
+	}
+	// No rate limit headers present (zero values) — proceed immediately.
+	if rl.Remaining == 0 && rl.Reset.IsZero() {
+		return nil
+	}
+	delay := time.Until(rl.Reset)
+	if delay <= 0 {
+		return nil
+	}
+	if delay > historyRateDelay {
+		delay = historyRateDelay
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
+		return nil
+	}
+}
+
+func fetchHistoryPage[T any](c *Client, ctx context.Context, path string) ([]T, *string, RateLimitInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("build request: %w", err)
+		return nil, nil, RateLimitInfo{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Authorization", c.authHeader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("http request: %w", err)
+		return nil, nil, RateLimitInfo{}, fmt.Errorf("http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+		return nil, nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
 	var page PaginatedResponse[T]
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
-		return nil, nil, fmt.Errorf("decode: %w", err)
+		return nil, nil, RateLimitInfo{}, fmt.Errorf("decode: %w", err)
 	}
-	return page.Items, page.NextPagePath, nil
+	return page.Items, page.NextPagePath, parseRateLimit(resp), nil
 }
