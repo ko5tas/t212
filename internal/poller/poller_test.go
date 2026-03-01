@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ko5tas/t212/internal/api"
+	"github.com/ko5tas/t212/internal/history"
 	"github.com/ko5tas/t212/internal/hub"
 	"github.com/ko5tas/t212/internal/poller"
 	"github.com/ko5tas/t212/internal/store"
@@ -299,6 +300,54 @@ func TestSendNotifications_NoDoubleNotifyOnStay(t *testing.T) {
 	}
 	if !calls[0].entered {
 		t.Errorf("sole notification should be enter, got: %+v", calls[0])
+	}
+}
+
+func TestPoller_BroadcastIncludesReturns(t *testing.T) {
+	positions := []api.Position{
+		{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3, AveragePrice: 173.20, CurrentPrice: 182.50},
+	}
+	var callCount atomic.Int32
+	srv := makeServer(t, positions, &callCount)
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	ch, unsub := h.Subscribe()
+	defer unsub()
+
+	hs := history.NewStore()
+	hs.Set("AAPL_US_EQ", api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.0})
+
+	p := poller.NewForTesting(
+		api.NewClient("k", "s", srv.URL, srv.Client()),
+		s, h, 1.00, nil, 50*time.Millisecond,
+		poller.WithHistoryStore(hs),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	select {
+	case msg := <-ch:
+		var payload struct {
+			Positions []api.Position `json:"positions"`
+		}
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if len(payload.Positions) != 1 {
+			t.Fatalf("expected 1 position, got %d", len(payload.Positions))
+		}
+		if payload.Positions[0].Returns == nil {
+			t.Fatal("Returns should be attached from history store")
+		}
+		if payload.Positions[0].Returns.Return != 42.30 {
+			t.Errorf("Return: got %v, want 42.30", payload.Positions[0].Returns.Return)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for broadcast")
 	}
 }
 
