@@ -20,3 +20,4 @@ th[data-col]:hover { color: #e2e8f0; }
 .btn-refresh:hover { background: #334155; color: #e2e8f0; }
 .btn-refresh-row { background: none; border: none; color: #475569; cursor: pointer; font-size: 0.9rem; padding: 0; }
 .btn-refresh-row:hover { color: #e2e8f0; }
+tfoot td { border-top: 2px solid #334155; background: #1e293b; font-weight: 600; font-size: 0.95rem; }

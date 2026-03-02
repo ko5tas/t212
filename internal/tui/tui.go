@@ -35,6 +35,7 @@ const (
 	SortAvgPrice
 	SortProfitPerShare
 	SortMarketValue
+	SortValueGBP
 	sortColumnCount // sentinel
 )
 
@@ -61,6 +62,8 @@ func (s SortColumn) String() string {
 		return "PROFIT/SHR"
 	case SortMarketValue:
 		return "MKT VALUE"
+	case SortValueGBP:
+		return "VALUE £"
 	}
 	return ""
 }
@@ -219,6 +222,8 @@ func posLess(a, b api.Position, col SortColumn) bool {
 		return a.ProfitPerShare < b.ProfitPerShare
 	case SortMarketValue:
 		return a.MarketValue < b.MarketValue
+	case SortValueGBP:
+		return a.CurrentValueGBP < b.CurrentValueGBP
 	}
 	return false
 }
@@ -229,6 +234,10 @@ var (
 	lossStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#f87171")).Bold(true)
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e2e8f0"))
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#475569"))
+	totalStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e2e8f0")).
+			Border(lipgloss.NormalBorder(), true, false, false, false).
+			BorderForeground(lipgloss.Color("#475569")).
+			PaddingTop(0)
 )
 
 func (m Model) renderHeader(name string, col SortColumn) string {
@@ -255,7 +264,7 @@ func (m Model) View() string {
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions") + "\n"
 	} else {
-		out += fmt.Sprintf("     %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s\n",
+		out += fmt.Sprintf("     %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s %12s\n",
 			m.renderHeader("TICKER", SortTicker),
 			m.renderHeader("NAME", SortName),
 			m.renderHeader("RETURN", SortReturn),
@@ -266,8 +275,9 @@ func (m Model) View() string {
 			m.renderHeader("AVG PRICE", SortAvgPrice),
 			m.renderHeader("PROFIT/SHR", SortProfitPerShare),
 			m.renderHeader("MKT VALUE", SortMarketValue),
+			m.renderHeader("VALUE £", SortValueGBP),
 		)
-		var totalReturn, totalBought float64
+		var totalReturn, totalBought, totalValueGBP float64
 		for i, p := range m.positions {
 			sym := p.CurrencySymbol()
 			marker := " "
@@ -305,7 +315,8 @@ func (m Model) View() string {
 			if len(name) > 22 {
 				name = name[:22]
 			}
-			out += fmt.Sprintf("%s%3d %-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
+			totalValueGBP += p.CurrentValueGBP
+			out += fmt.Sprintf("%s%3d %-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f £%11.2f\n",
 				marker,
 				i+1,
 				p.Ticker,
@@ -316,6 +327,7 @@ func (m Model) View() string {
 				sym, p.AveragePrice,
 				ppsStr,
 				sym, p.MarketValue,
+				p.CurrentValueGBP,
 			)
 		}
 		// Totals row
@@ -332,12 +344,16 @@ func (m Model) View() string {
 			totalRetStr = lossStyle.Render(totalRetStr)
 			totalPctStr = lossStyle.Render(totalPctStr)
 		}
-		out += fmt.Sprintf("     %-16s %-24s %s %s\n",
-			headerStyle.Render("TOTAL"),
+		totalValGBPStr := fmt.Sprintf("£%11.2f", totalValueGBP)
+		totalsLine := fmt.Sprintf("     %-16s %-24s %s %s %10s %10s %13s %12s %14s %14s %s",
+			"TOTAL",
 			"",
 			totalRetStr,
 			totalPctStr,
+			"", "", "", "", "", "",
+			totalValGBPStr,
 		)
+		out += totalStyle.Render(totalsLine) + "\n"
 	}
 
 	if !m.updated.IsZero() {

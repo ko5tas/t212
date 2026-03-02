@@ -308,12 +308,12 @@ func TestModel_ViewRowNumbersAndTotals(t *testing.T) {
 		Positions: []api.Position{
 			{
 				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
-				ProfitPerShare: 9.30, MarketValue: 547.50,
+				ProfitPerShare: 9.30, MarketValue: 547.50, CurrentValueGBP: 412.05,
 				Returns: &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, TotalBought: 100},
 			},
 			{
 				Ticker: "TSLA_US_EQ", Currency: "USD", Quantity: 1,
-				ProfitPerShare: -5.00, MarketValue: 195.00,
+				ProfitPerShare: -5.00, MarketValue: 195.00, CurrentValueGBP: 155.00,
 				Returns: &api.ReturnInfo{Return: -10.00, ReturnPct: -5.00, TotalBought: 200},
 			},
 		},
@@ -334,5 +334,14 @@ func TestModel_ViewRowNumbersAndTotals(t *testing.T) {
 	// Total return = 42.30 + (-10.00) = 32.30
 	if !strings.Contains(view, "32.30") {
 		t.Error("view should contain total return 32.30")
+	}
+
+	// VALUE £ column header
+	if !strings.Contains(view, "VALUE") {
+		t.Error("view should contain VALUE £ header")
+	}
+	// Total VALUE £ = 412.05 + 155.00 = 567.05
+	if !strings.Contains(view, "567.05") {
+		t.Error("view should contain total VALUE £ 567.05")
 	}
 }
