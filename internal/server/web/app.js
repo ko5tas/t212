@@ -131,12 +131,13 @@
         }
         var ppsClass = p.profitPerShare >= 0 ? 'profit' : 'loss';
         var ppsSign = p.profitPerShare >= 0 ? '+' : '';
+        var mvCls = (r && (p.currentValueGBP || 0) > (r.totalBought || 0)) ? 'profit' : '';
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + (idx + 1) + '</td>' +
           '<td>' + p.ticker + '</td>' +
           '<td>' + (p.name || '') + '</td>' +
-          '<td>' + fmt(p.currentValueGBP || 0, 'GBP') +
+          '<td class="' + mvCls + '">' + fmt(p.currentValueGBP || 0, 'GBP') +
             (c !== 'GBP' ? ' <span class="mv-native">(' + fmt(p.marketValue, c) + ')</span>' : '') +
           '</td>' +
           '<td><button class="btn-refresh-row" title="Refresh ' + p.ticker + '">&#x21bb;</button></td>' +
