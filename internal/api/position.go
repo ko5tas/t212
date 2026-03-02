@@ -4,6 +4,7 @@ package api
 // ProfitPerShare and MarketValue are computed fields — call Compute() after unmarshalling.
 type Position struct {
 	Ticker          string  `json:"ticker"`
+	Name            string  `json:"name"`
 	Currency        string  `json:"currency"`
 	Quantity        float64 `json:"quantity"`
 	AveragePrice    float64 `json:"averagePrice"`

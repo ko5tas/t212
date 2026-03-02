@@ -22,7 +22,7 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 		json.NewEncoder(w).Encode([]map[string]any{
 			{
-				"instrument":       map[string]any{"ticker": "AAPL_US_EQ"},
+				"instrument":       map[string]any{"ticker": "AAPL_US_EQ", "name": "Apple"},
 				"quantity":         3.0,
 				"averagePricePaid": 173.20,
 				"currentPrice":    182.50,
@@ -42,6 +42,9 @@ func TestClient_FetchPositions_Success(t *testing.T) {
 	}
 	if positions[0].Ticker != "AAPL_US_EQ" {
 		t.Errorf("ticker: got %q, want AAPL_US_EQ", positions[0].Ticker)
+	}
+	if positions[0].Name != "Apple" {
+		t.Errorf("name: got %q, want Apple", positions[0].Name)
 	}
 	if positions[0].Currency != "USD" {
 		t.Errorf("currency: got %q, want USD", positions[0].Currency)
@@ -96,7 +99,7 @@ func TestClient_FetchPositions_GBXConversion(t *testing.T) {
 		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
 		json.NewEncoder(w).Encode([]map[string]any{
 			{
-				"instrument":       map[string]any{"ticker": "LLOY_EQ"},
+				"instrument":       map[string]any{"ticker": "LLOY_EQ", "name": "Lloyds Banking Group"},
 				"quantity":         1000.0,
 				"averagePricePaid": 5500.0,  // 5500 GBX = £55.00
 				"currentPrice":     5612.0,  // 5612 GBX = £56.12

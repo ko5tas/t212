@@ -26,6 +26,7 @@ type SortColumn int
 
 const (
 	SortTicker SortColumn = iota
+	SortName
 	SortReturn
 	SortReturnPct
 	SortNetROI
@@ -42,6 +43,8 @@ func (s SortColumn) String() string {
 	switch s {
 	case SortTicker:
 		return "TICKER"
+	case SortName:
+		return "NAME"
 	case SortReturn:
 		return "RETURN"
 	case SortReturnPct:
@@ -198,6 +201,8 @@ func posLess(a, b api.Position, col SortColumn) bool {
 	switch col {
 	case SortTicker:
 		return a.Ticker < b.Ticker
+	case SortName:
+		return a.Name < b.Name
 	case SortReturn:
 		return returnVal(a) < returnVal(b)
 	case SortReturnPct:
@@ -250,8 +255,9 @@ func (m Model) View() string {
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions") + "\n"
 	} else {
-		out += fmt.Sprintf("  %-20s %10s %10s %10s %10s %13s %12s %14s %14s\n",
+		out += fmt.Sprintf("  %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s\n",
 			m.renderHeader("TICKER", SortTicker),
+			m.renderHeader("NAME", SortName),
 			m.renderHeader("RETURN", SortReturn),
 			m.renderHeader("RETURN %", SortReturnPct),
 			m.renderHeader("NET ROI %", SortNetROI),
@@ -278,9 +284,14 @@ func (m Model) View() string {
 			} else {
 				ppsStr = lossStyle.Render(ppsStr)
 			}
-			out += fmt.Sprintf("%s%-20s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
+			name := p.Name
+			if len(name) > 22 {
+				name = name[:22]
+			}
+			out += fmt.Sprintf("%s%-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
 				marker,
 				p.Ticker,
+				name,
 				retStr,
 				p.Quantity,
 				sym, p.CurrentPrice,

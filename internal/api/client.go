@@ -74,6 +74,7 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 	type wirePosition struct {
 		Instrument struct {
 			Ticker string `json:"ticker"`
+			Name   string `json:"name"`
 		} `json:"instrument"`
 		Quantity     float64 `json:"quantity"`
 		AveragePrice float64 `json:"averagePricePaid"`
@@ -99,6 +100,7 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 		}
 		positions[i] = Position{
 			Ticker:          r.Instrument.Ticker,
+			Name:            r.Instrument.Name,
 			Currency:        currency,
 			Quantity:        r.Quantity,
 			AveragePrice:    avg,

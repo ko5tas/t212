@@ -33,6 +33,7 @@
   function colValue(p, col) {
     switch (col) {
       case 'ticker': return p.ticker || '';
+      case 'name': return p.name || '';
       case 'return': return p.returns ? p.returns['return'] : 0;
       case 'returnPct': return p.returns ? p.returns.returnPct : 0;
       case 'netRoi': return p.returns ? p.returns.netRoiPct : 0;
@@ -109,6 +110,7 @@
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + p.ticker + '</td>' +
+          '<td>' + (p.name || '') + '</td>' +
           '<td><button class="btn-refresh-row" title="Refresh ' + p.ticker + '">&#x21bb;</button></td>' +
           '<td>' + retVal + '</td>' +
           '<td>' + retPct + '</td>' +

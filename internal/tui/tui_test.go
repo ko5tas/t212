@@ -163,7 +163,7 @@ func TestModel_ViewColumnOrder(t *testing.T) {
 		Timestamp: time.Now(),
 		Positions: []api.Position{
 			{
-				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
+				Ticker: "AAPL_US_EQ", Name: "Apple", Currency: "USD", Quantity: 3,
 				AveragePrice: 173.20, CurrentPrice: 182.50,
 				ProfitPerShare: 9.30, MarketValue: 547.50,
 			},
@@ -172,6 +172,22 @@ func TestModel_ViewColumnOrder(t *testing.T) {
 	b, _ := json.Marshal(payload)
 	updated := m.ApplyMessage(b)
 	view := updated.View()
+
+	// NAME should appear between TICKER and RETURN
+	nameIdx := strings.Index(view, "NAME")
+	tickerIdx := strings.Index(view, "TICKER")
+	retIdx := strings.Index(view, "RETURN")
+	if nameIdx < 0 || tickerIdx < 0 || retIdx < 0 {
+		t.Fatal("view should contain TICKER, NAME, and RETURN headers")
+	}
+	if nameIdx < tickerIdx || nameIdx > retIdx {
+		t.Error("NAME should appear between TICKER and RETURN")
+	}
+
+	// Name value should appear in the row
+	if !strings.Contains(view, "Apple") {
+		t.Error("view should contain the instrument name 'Apple'")
+	}
 
 	// Current Price should appear before Avg Price in the header
 	currIdx := strings.Index(view, "CURR PRICE")

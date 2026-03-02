@@ -25,7 +25,7 @@ func t212Wire(positions []api.Position) []map[string]any {
 	out := make([]map[string]any, len(positions))
 	for i, p := range positions {
 		out[i] = map[string]any{
-			"instrument":       map[string]any{"ticker": p.Ticker},
+			"instrument":       map[string]any{"ticker": p.Ticker, "name": p.Name},
 			"quantity":         p.Quantity,
 			"averagePricePaid": p.AveragePrice,
 			"currentPrice":     p.CurrentPrice,
