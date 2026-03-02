@@ -336,12 +336,12 @@ func TestModel_ViewRowNumbersAndTotals(t *testing.T) {
 		t.Error("view should contain total return 32.30")
 	}
 
-	// VALUE £ column header
-	if !strings.Contains(view, "VALUE") {
-		t.Error("view should contain VALUE £ header")
+	// MKT VALUE column header
+	if !strings.Contains(view, "MKT VALUE") {
+		t.Error("view should contain MKT VALUE header")
 	}
-	// Total VALUE £ = 412.05 + 155.00 = 567.05
+	// Total market value in GBP = 412.05 + 155.00 = 567.05
 	if !strings.Contains(view, "567.05") {
-		t.Error("view should contain total VALUE £ 567.05")
+		t.Error("view should contain total market value £567.05")
 	}
 }

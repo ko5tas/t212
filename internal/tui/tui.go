@@ -35,7 +35,6 @@ const (
 	SortAvgPrice
 	SortProfitPerShare
 	SortMarketValue
-	SortValueGBP
 	sortColumnCount // sentinel
 )
 
@@ -62,8 +61,6 @@ func (s SortColumn) String() string {
 		return "PROFIT/SHR"
 	case SortMarketValue:
 		return "MKT VALUE"
-	case SortValueGBP:
-		return "VALUE £"
 	}
 	return ""
 }
@@ -221,8 +218,6 @@ func posLess(a, b api.Position, col SortColumn) bool {
 	case SortProfitPerShare:
 		return a.ProfitPerShare < b.ProfitPerShare
 	case SortMarketValue:
-		return a.MarketValue < b.MarketValue
-	case SortValueGBP:
 		return a.CurrentValueGBP < b.CurrentValueGBP
 	}
 	return false
@@ -264,7 +259,7 @@ func (m Model) View() string {
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions") + "\n"
 	} else {
-		out += fmt.Sprintf("     %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s %12s\n",
+		out += fmt.Sprintf("     %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %s\n",
 			m.renderHeader("TICKER", SortTicker),
 			m.renderHeader("NAME", SortName),
 			m.renderHeader("RETURN", SortReturn),
@@ -275,7 +270,6 @@ func (m Model) View() string {
 			m.renderHeader("AVG PRICE", SortAvgPrice),
 			m.renderHeader("PROFIT/SHR", SortProfitPerShare),
 			m.renderHeader("MKT VALUE", SortMarketValue),
-			m.renderHeader("VALUE £", SortValueGBP),
 		)
 		var totalReturn, totalBought, totalValueGBP float64
 		for i, p := range m.positions {
@@ -316,7 +310,11 @@ func (m Model) View() string {
 				name = name[:22]
 			}
 			totalValueGBP += p.CurrentValueGBP
-			out += fmt.Sprintf("%s%3d %-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f £%11.2f\n",
+			mvStr := fmt.Sprintf("£%.2f", p.CurrentValueGBP)
+			if p.Currency != "" && p.Currency != "GBP" {
+				mvStr += fmt.Sprintf(" (%s%.2f)", sym, p.MarketValue)
+			}
+			out += fmt.Sprintf("%s%3d %-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s\n",
 				marker,
 				i+1,
 				p.Ticker,
@@ -326,8 +324,7 @@ func (m Model) View() string {
 				sym, p.CurrentPrice,
 				sym, p.AveragePrice,
 				ppsStr,
-				sym, p.MarketValue,
-				p.CurrentValueGBP,
+				mvStr,
 			)
 		}
 		// Totals row
@@ -344,13 +341,13 @@ func (m Model) View() string {
 			totalRetStr = lossStyle.Render(totalRetStr)
 			totalPctStr = lossStyle.Render(totalPctStr)
 		}
-		totalValGBPStr := fmt.Sprintf("£%11.2f", totalValueGBP)
-		totalsLine := fmt.Sprintf("     %-16s %-24s %s %s %10s %10s %13s %12s %14s %14s %s",
+		totalValGBPStr := fmt.Sprintf("£%.2f", totalValueGBP)
+		totalsLine := fmt.Sprintf("     %-16s %-24s %s %s %10s %10s %13s %12s %14s %s",
 			"TOTAL",
 			"",
 			totalRetStr,
 			totalPctStr,
-			"", "", "", "", "", "",
+			"", "", "", "", "",
 			totalValGBPStr,
 		)
 		out += totalStyle.Render(totalsLine) + "\n"

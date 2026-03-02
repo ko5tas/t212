@@ -41,8 +41,7 @@
       case 'currentPrice': return p.currentPrice || 0;
       case 'averagePrice': return p.averagePrice || 0;
       case 'profitPerShare': return p.profitPerShare || 0;
-      case 'marketValue': return p.marketValue || 0;
-      case 'valueGBP': return p.currentValueGBP || 0;
+      case 'marketValue': return p.currentValueGBP || 0;
       default: return 0;
     }
   }
@@ -145,8 +144,9 @@
           '<td>' + fmt(p.currentPrice, c) + '</td>' +
           '<td>' + fmt(p.averagePrice, c) + '</td>' +
           '<td class="' + ppsClass + '">' + ppsSign + fmt(p.profitPerShare, c) + '</td>' +
-          '<td>' + fmt(p.marketValue, c) + '</td>' +
-          '<td>' + fmt(p.currentValueGBP || 0, 'GBP') + '</td>';
+          '<td>' + fmt(p.currentValueGBP || 0, 'GBP') +
+            (c !== 'GBP' ? ' <span class="mv-native">(' + fmt(p.marketValue, c) + ')</span>' : '') +
+          '</td>';
         totalValueGBP += p.currentValueGBP || 0;
         tr.querySelector('.btn-refresh-row').addEventListener('click', function () {
           sendRefresh(p.ticker);
@@ -163,7 +163,7 @@
         '<td></td><td></td>' +
         '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
         '<td class="' + totCls + '"><strong>' + totalRetPct.toFixed(1) + '%</strong></td>' +
-        '<td></td><td></td><td></td><td></td><td></td><td></td>' +
+        '<td></td><td></td><td></td><td></td><td></td>' +
         '<td><strong>' + fmt(totalValueGBP, 'GBP') + '</strong></td>';
       tfootEl.appendChild(tfoot);
     }
