@@ -160,6 +160,7 @@
       tfoot.innerHTML =
         '<td></td>' +
         '<td><strong>TOTAL</strong></td>' +
+        '<td></td>' +
         '<td><strong>' + fmt(totalValueGBP, 'GBP') + '</strong></td>' +
         '<td></td>' +
         '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
