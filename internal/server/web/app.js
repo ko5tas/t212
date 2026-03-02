@@ -136,6 +136,9 @@
           '<td>' + (idx + 1) + '</td>' +
           '<td>' + p.ticker + '</td>' +
           '<td>' + (p.name || '') + '</td>' +
+          '<td>' + fmt(p.currentValueGBP || 0, 'GBP') +
+            (c !== 'GBP' ? ' <span class="mv-native">(' + fmt(p.marketValue, c) + ')</span>' : '') +
+          '</td>' +
           '<td><button class="btn-refresh-row" title="Refresh ' + p.ticker + '">&#x21bb;</button></td>' +
           '<td class="' + retCls + '">' + retVal + '</td>' +
           '<td class="' + pctCls + '">' + retPct + '</td>' +
@@ -143,10 +146,7 @@
           '<td>' + p.quantity + '</td>' +
           '<td>' + fmt(p.currentPrice, c) + '</td>' +
           '<td>' + fmt(p.averagePrice, c) + '</td>' +
-          '<td class="' + ppsClass + '">' + ppsSign + fmt(p.profitPerShare, c) + '</td>' +
-          '<td>' + fmt(p.currentValueGBP || 0, 'GBP') +
-            (c !== 'GBP' ? ' <span class="mv-native">(' + fmt(p.marketValue, c) + ')</span>' : '') +
-          '</td>';
+          '<td class="' + ppsClass + '">' + ppsSign + fmt(p.profitPerShare, c) + '</td>';
         totalValueGBP += p.currentValueGBP || 0;
         tr.querySelector('.btn-refresh-row').addEventListener('click', function () {
           sendRefresh(p.ticker);
@@ -160,11 +160,11 @@
       tfoot.innerHTML =
         '<td></td>' +
         '<td><strong>TOTAL</strong></td>' +
-        '<td></td><td></td>' +
+        '<td><strong>' + fmt(totalValueGBP, 'GBP') + '</strong></td>' +
+        '<td></td>' +
         '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
         '<td class="' + totCls + '"><strong>' + totalRetPct.toFixed(1) + '%</strong></td>' +
-        '<td></td><td></td><td></td><td></td><td></td>' +
-        '<td><strong>' + fmt(totalValueGBP, 'GBP') + '</strong></td>';
+        '<td></td><td></td><td></td><td></td><td></td>';
       tfootEl.appendChild(tfoot);
     }
   }
