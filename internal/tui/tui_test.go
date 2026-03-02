@@ -300,3 +300,39 @@ func TestModel_SortIndicatorInView(t *testing.T) {
 		t.Error("view should contain ▼ indicator for default desc sort")
 	}
 }
+
+func TestModel_ViewRowNumbersAndTotals(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{
+				Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 3,
+				ProfitPerShare: 9.30, MarketValue: 547.50,
+				Returns: &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, TotalBought: 100},
+			},
+			{
+				Ticker: "TSLA_US_EQ", Currency: "USD", Quantity: 1,
+				ProfitPerShare: -5.00, MarketValue: 195.00,
+				Returns: &api.ReturnInfo{Return: -10.00, ReturnPct: -5.00, TotalBought: 200},
+			},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+	view := m.View()
+
+	// Row numbers should be present
+	if !strings.Contains(view, "  1 ") && !strings.Contains(view, ">  1 ") {
+		t.Error("view should contain row number 1")
+	}
+
+	// Totals row
+	if !strings.Contains(view, "TOTAL") {
+		t.Error("view should contain a TOTAL row")
+	}
+	// Total return = 42.30 + (-10.00) = 32.30
+	if !strings.Contains(view, "32.30") {
+		t.Error("view should contain total return 32.30")
+	}
+}

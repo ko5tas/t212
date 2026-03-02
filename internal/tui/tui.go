@@ -255,7 +255,7 @@ func (m Model) View() string {
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions") + "\n"
 	} else {
-		out += fmt.Sprintf("  %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s\n",
+		out += fmt.Sprintf("     %-16s %-24s %10s %10s %10s %10s %13s %12s %14s %14s\n",
 			m.renderHeader("TICKER", SortTicker),
 			m.renderHeader("NAME", SortName),
 			m.renderHeader("RETURN", SortReturn),
@@ -267,16 +267,33 @@ func (m Model) View() string {
 			m.renderHeader("PROFIT/SHR", SortProfitPerShare),
 			m.renderHeader("MKT VALUE", SortMarketValue),
 		)
+		var totalReturn, totalBought float64
 		for i, p := range m.positions {
 			sym := p.CurrencySymbol()
-			marker := "  "
+			marker := " "
 			if i == m.cursor {
-				marker = "> "
+				marker = ">"
 			}
 			retStr := fmt.Sprintf("%10s %10s %10s", "--", "--", "--")
 			if p.Returns != nil {
-				retStr = fmt.Sprintf("%10.2f %9.2f%% %9.2f%%",
-					p.Returns.Return, p.Returns.ReturnPct, p.Returns.NetROIPct)
+				retVal := fmt.Sprintf("%10.2f", p.Returns.Return)
+				retPct := fmt.Sprintf("%9.2f%%", p.Returns.ReturnPct)
+				roiPct := fmt.Sprintf("%9.2f%%", p.Returns.NetROIPct)
+				if p.Returns.ReturnPct > 50 {
+					retVal = profitStyle.Render(retVal)
+					retPct = profitStyle.Render(retPct)
+				} else if p.Returns.Return < 0 {
+					retVal = lossStyle.Render(retVal)
+					retPct = lossStyle.Render(retPct)
+				}
+				if p.Returns.NetROIPct > 50 {
+					roiPct = profitStyle.Render(roiPct)
+				} else if p.Returns.NetROIPct < 0 {
+					roiPct = lossStyle.Render(roiPct)
+				}
+				retStr = fmt.Sprintf("%s %s %s", retVal, retPct, roiPct)
+				totalReturn += p.Returns.Return
+				totalBought += p.Returns.TotalBought
 			}
 			ppsStr := fmt.Sprintf("%s%+12.2f", sym, p.ProfitPerShare)
 			if p.ProfitPerShare >= 0 {
@@ -288,8 +305,9 @@ func (m Model) View() string {
 			if len(name) > 22 {
 				name = name[:22]
 			}
-			out += fmt.Sprintf("%s%-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
+			out += fmt.Sprintf("%s%3d %-16s %-24s %s %10.4f %s%12.2f %s%11.2f %s %s%13.2f\n",
 				marker,
+				i+1,
 				p.Ticker,
 				name,
 				retStr,
@@ -300,6 +318,26 @@ func (m Model) View() string {
 				sym, p.MarketValue,
 			)
 		}
+		// Totals row
+		var totalRetPct float64
+		if totalBought > 0 {
+			totalRetPct = totalReturn / totalBought * 100
+		}
+		totalRetStr := fmt.Sprintf("%10.2f", totalReturn)
+		totalPctStr := fmt.Sprintf("%9.2f%%", totalRetPct)
+		if totalRetPct > 50 {
+			totalRetStr = profitStyle.Render(totalRetStr)
+			totalPctStr = profitStyle.Render(totalPctStr)
+		} else if totalReturn < 0 {
+			totalRetStr = lossStyle.Render(totalRetStr)
+			totalPctStr = lossStyle.Render(totalPctStr)
+		}
+		out += fmt.Sprintf("     %-16s %-24s %s %s\n",
+			headerStyle.Render("TOTAL"),
+			"",
+			totalRetStr,
+			totalPctStr,
+		)
 	}
 
 	if !m.updated.IsZero() {
