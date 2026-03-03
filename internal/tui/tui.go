@@ -316,7 +316,7 @@ func (m Model) View() string {
 				mvStr += fmt.Sprintf(" (%s%.2f)", sym, p.MarketValue)
 			}
 			mvStr = fmt.Sprintf("%-20s", mvStr)
-			if p.Returns != nil && p.CurrentValueGBP > p.Returns.TotalBought {
+			if p.Returns != nil && p.CurrentValueGBP > p.Returns.TotalBought+1 {
 				mvStr = profitBlinkStyle.Render(mvStr)
 			}
 			out += fmt.Sprintf("%s%3d %-16s %-24s %s %s %10.4f %s%12.2f %s%11.2f %s\n",
