@@ -13,7 +13,7 @@
 
   var ws = null;
   var lastPositions = [];
-  var sortCol = 'profitPerShare';
+  var sortCol = 'marketValue';
   var sortAsc = false;
 
   function sendRefresh(ticker) {

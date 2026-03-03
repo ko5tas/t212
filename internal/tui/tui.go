@@ -79,7 +79,7 @@ type Model struct {
 
 // NewModel returns an empty Model.
 func NewModel() Model {
-	return Model{positions: []api.Position{}, sortCol: SortProfitPerShare}
+	return Model{positions: []api.Position{}, sortCol: SortMarketValue}
 }
 
 // Positions returns the current positions.

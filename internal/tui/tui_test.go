@@ -239,16 +239,16 @@ func TestModel_SortCycleColumn(t *testing.T) {
 	b, _ := json.Marshal(payload)
 	m = m.ApplyMessage(b)
 
-	// Default sort is ProfitPerShare desc
-	if m.SortCol() != tui.SortProfitPerShare {
-		t.Errorf("default sort column should be ProfitPerShare, got %v", m.SortCol())
+	// Default sort is MarketValue desc
+	if m.SortCol() != tui.SortMarketValue {
+		t.Errorf("default sort column should be MarketValue, got %v", m.SortCol())
 	}
 
 	// Press 's' to cycle to next column
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	model := m2.(tui.Model)
-	if model.SortCol() != tui.SortMarketValue {
-		t.Errorf("sort column after s should be MarketValue, got %v", model.SortCol())
+	if model.SortCol() != tui.SortTicker {
+		t.Errorf("sort column after s should be Ticker (wraps from MarketValue), got %v", model.SortCol())
 	}
 }
 
