@@ -16,6 +16,10 @@ case "$1" in
         chown root:root /etc/t212/config.env
         chmod 0600 /etc/t212/config.env
 
+        # Create signal-cli data directory (used via SIGNAL_CLI_CONFIG)
+        mkdir -p /var/lib/t212/signal-cli
+        chown t212:t212 /var/lib/t212/signal-cli
+
         # Register and enable the service (does NOT start it)
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload

@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/t212/config.env
+Environment="SIGNAL_CLI_CONFIG=/var/lib/t212/signal-cli"
 ExecStart=/usr/local/bin/t212 serve
 Restart=always
 RestartSec=5
