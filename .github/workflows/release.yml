@@ -44,3 +44,57 @@ jobs:
             t212_${{ github.ref_name }}_arm64.deb
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: t212_${{ github.ref_name }}_arm64.deb
+
+  publish-apt:
+    name: Publish to APT repository
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download .deb artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+
+      - name: Check out gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+
+      - name: Update APT repository
+        run: |
+          cp t212_${{ github.ref_name }}_arm64.deb gh-pages/apt/pool/main/
+
+          cd gh-pages/apt
+
+          # Generate Packages index
+          dpkg-scanpackages pool/main /dev/null > dists/stable/main/binary-arm64/Packages
+          gzip -k -f dists/stable/main/binary-arm64/Packages
+
+          # Generate Release file
+          cd dists/stable
+          apt-ftparchive release . > Release
+
+          # Sign Release
+          gpg --batch --yes --armor --detach-sign -o Release.gpg Release
+          gpg --batch --yes --clearsign -o InRelease Release
+
+      - name: Push to gh-pages
+        run: |
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "apt: publish t212 ${{ github.ref_name }}"
+          git push

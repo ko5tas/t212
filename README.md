@@ -58,12 +58,33 @@ sendNotifications → signal-cli subprocess → Signal message
 
 ## Installation (DietPi / Raspberry Pi 5)
 
+### Option A: APT repository (recommended)
+
+Add the t212 APT repository for automatic updates:
+
+```bash
+curl -fsSL https://ko5tas.github.io/t212/apt/setup.sh | sudo bash
+sudo apt install t212
+```
+
+Future updates arrive via `sudo apt update && sudo apt upgrade`.
+
+Or from your build machine:
+
+```bash
+make setup-apt PI_HOST=pi@raspberrypi.local
+```
+
+### Option B: Manual download
+
 Download the latest `.deb` from the [Releases page](https://github.com/ko5tas/t212/releases/latest):
 
 ```bash
 wget https://github.com/ko5tas/t212/releases/latest/download/t212_<version>_arm64.deb
 sudo dpkg -i t212_<version>_arm64.deb
 ```
+
+### Post-install setup
 
 The installer prints the exact steps to configure and start the service. In summary:
 
@@ -81,7 +102,9 @@ sudo journalctl -u t212 -f
 
 Open `http://<raspberry-pi-ip>:8080` in a browser on the same LAN.
 
-**Upgrading:** re-download and `sudo dpkg -i t212_<new-version>_arm64.deb`. Your `/etc/t212/config.env` is preserved automatically.
+**Upgrading (APT):** `sudo apt update && sudo apt upgrade` — automatic.
+
+**Upgrading (manual):** re-download and `sudo dpkg -i t212_<new-version>_arm64.deb`. Your `/etc/t212/config.env` is preserved automatically.
 
 **Removing:** `sudo dpkg -r t212` (config survives). `sudo dpkg --purge t212` (config deleted).
 
@@ -212,6 +235,7 @@ Downloads the latest release from GitHub, verifies the SHA256 checksum, and repl
 | `make lint` | Run `golangci-lint` |
 | `make security` | Run `govulncheck` |
 | `make deploy` | Build + deploy to Pi via SSH/SCP |
+| `make setup-apt` | Add t212 APT repository on Pi for automatic updates |
 | `make setup-signal` | Register Pi as Signal linked device |
 | `make update-signal-cli` | Download and verify latest signal-cli release |
 | `make logs` | Tail systemd journal from Pi |

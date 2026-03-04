@@ -7,7 +7,7 @@ PI_CFG_DIR  := /etc/t212
 
 VERSION     ?= $(shell v=$$(git describe --tags --abbrev=0 2>/dev/null) && echo "$$v" | sed 's/^v//' || echo "0.0.0-dev")
 
-.PHONY: build build-arm test lint security deb deploy setup-signal update-signal-cli logs clean
+.PHONY: build build-arm test lint security deb deploy setup-apt setup-signal update-signal-cli logs clean
 
 ## build: compile for current platform
 build:
@@ -45,6 +45,10 @@ deploy: build-arm
 	ssh $(PI_HOST) "sudo mv /tmp/t212.service $(PI_SVC_DIR)/t212.service"
 	ssh $(PI_HOST) "sudo systemctl daemon-reload && sudo systemctl enable t212 && sudo systemctl restart t212"
 	@echo "Deployed. Run: make logs"
+
+## setup-apt: add t212 APT repository on Pi for automatic updates
+setup-apt:
+	ssh $(PI_HOST) "curl -fsSL https://ko5tas.github.io/t212/apt/setup.sh | sudo bash"
 
 ## setup-signal: register Pi as Signal linked device (scan QR with Signal app)
 setup-signal:
