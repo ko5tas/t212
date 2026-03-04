@@ -1,3 +1,20 @@
+Package: signal-cli
+Version: 0.14.0
+Architecture: arm64
+Maintainer: t212 <noreply@github.com>
+Installed-Size: 0
+Filename: pool/main/signal-cli_0.14.0_arm64.deb
+Size: 974
+MD5sum: 233681a87d6aef6dfd2aa31de9c0f646
+SHA1: bbb11f3098f7e18e14dfccaa8d9187aea7f8cc1e
+SHA256: c2be8a16439f24bca476ab7e123c694739f154df711bf4a88f193410fedf0b7e
+Section: utils
+Priority: optional
+Homepage: https://github.com/AsamK/signal-cli
+Description: signal-cli repackaged for the t212 APT repository.
+ Command-line interface for the Signal messenger.
+ Upstream: https://github.com/AsamK/signal-cli
+
 Package: t212
 Version: 1.4.0
 Architecture: arm64
