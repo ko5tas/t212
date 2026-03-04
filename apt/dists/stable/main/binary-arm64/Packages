@@ -5,9 +5,9 @@ Maintainer: t212 <noreply@github.com>
 Installed-Size: 10604
 Filename: pool/main/t212_1.4.0_arm64.deb
 Size: 5803898
-MD5sum: 4d637757a09bc40746445b66676483a9
-SHA1: 36bab9b38adeef3c1136841427477c51f4b580ce
-SHA256: 0bee4465798c95e4c646a50d995a5570840fa0b964942b669bb1bd1baaa6a350
+MD5sum: 3d00299375fa1d5fb2bd628e9b3d3555
+SHA1: 3978f2e67e9490404179a9b058db3ede1777905a
+SHA256: 58e55a5028486300d90934f0e58978dc4d8d3244fbafbf16951b391f8fa1e2cd
 Section: utils
 Priority: optional
 Homepage: https://github.com/ko5tas/t212
