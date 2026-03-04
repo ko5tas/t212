@@ -4,10 +4,10 @@ Architecture: arm64
 Maintainer: t212 <noreply@github.com>
 Installed-Size: 52270
 Filename: pool/main/signal-cli_0.14.0_arm64.deb
-Size: 50026208
-MD5sum: 848b4d38f0d7031b3695a7e504a84a88
-SHA1: 5ab6fd87cc9288741852de1b422c7231988ff011
-SHA256: 88e13fd0babc9c2d42c0d0de76a58b2218c88b59f3480e7e753109898ef01bb9
+Size: 50026324
+MD5sum: a701942d354322f8db7fef16e5581415
+SHA1: c701c342ae2d27a1fd14057c3b388455b9cd27b8
+SHA256: ee4bf8a6dafc2c58689d678a078a2532a6f0da01954f03f9251d4885a9568108
 Section: utils
 Priority: optional
 Homepage: https://github.com/AsamK/signal-cli
