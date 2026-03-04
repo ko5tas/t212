@@ -13,6 +13,7 @@ User=t212
 Group=t212
 NoNewPrivileges=yes
 ProtectSystem=strict
+ReadWritePaths=/var/lib/t212
 PrivateTmp=yes
 ProtectHome=yes
 PrivateDevices=yes
