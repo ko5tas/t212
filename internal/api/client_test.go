@@ -178,10 +178,19 @@ func TestClient_FetchExchanges(t *testing.T) {
 		if r.URL.Path != "/api/v0/equity/metadata/exchanges" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		// Real API returns exchanges with nested workingSchedules arrays.
+		// Each workingSchedule ID maps to the parent exchange name.
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"id": 1, "name": "NYSE"},
-			{"id": 2, "name": "London Stock Exchange"},
-			{"id": 3, "name": "Euronext Paris"},
+			{"id": 1, "name": "NYSE", "workingSchedules": []map[string]any{
+				{"id": 10, "timeEvents": []any{}},
+				{"id": 11, "timeEvents": []any{}},
+			}},
+			{"id": 2, "name": "London Stock Exchange", "workingSchedules": []map[string]any{
+				{"id": 20, "timeEvents": []any{}},
+			}},
+			{"id": 3, "name": "Euronext Paris", "workingSchedules": []map[string]any{
+				{"id": 30, "timeEvents": []any{}},
+			}},
 		})
 	}))
 	defer srv.Close()
@@ -191,11 +200,23 @@ func TestClient_FetchExchanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(exchanges) != 3 {
-		t.Fatalf("expected 3 exchanges, got %d", len(exchanges))
+	// 4 total: NYSE has 2 working schedules, LSE has 1, Euronext has 1
+	if len(exchanges) != 4 {
+		t.Fatalf("expected 4 flattened exchanges, got %d", len(exchanges))
 	}
-	if exchanges[2].Name != "Euronext Paris" {
-		t.Errorf("name: got %q, want Euronext Paris", exchanges[2].Name)
+	// Verify working schedule IDs map to correct exchange names
+	scheduleMap := make(map[int]string)
+	for _, ex := range exchanges {
+		scheduleMap[ex.ID] = ex.Name
+	}
+	if scheduleMap[10] != "NYSE" {
+		t.Errorf("schedule 10: got %q, want NYSE", scheduleMap[10])
+	}
+	if scheduleMap[20] != "London Stock Exchange" {
+		t.Errorf("schedule 20: got %q, want London Stock Exchange", scheduleMap[20])
+	}
+	if scheduleMap[30] != "Euronext Paris" {
+		t.Errorf("schedule 30: got %q, want Euronext Paris", scheduleMap[30])
 	}
 }
 
@@ -209,8 +230,12 @@ func TestClient_LoadMetadata_PopulatesCache(t *testing.T) {
 			})
 		case "/api/v0/equity/metadata/exchanges":
 			json.NewEncoder(w).Encode([]map[string]any{
-				{"id": 2, "name": "London Stock Exchange"},
-				{"id": 3, "name": "Euronext Paris"},
+				{"id": 1, "name": "London Stock Exchange", "workingSchedules": []map[string]any{
+					{"id": 2, "timeEvents": []any{}},
+				}},
+				{"id": 2, "name": "Euronext Paris", "workingSchedules": []map[string]any{
+					{"id": 3, "timeEvents": []any{}},
+				}},
 			})
 		case "/api/v0/equity/positions":
 			w.Header().Set("x-ratelimit-remaining", "59")

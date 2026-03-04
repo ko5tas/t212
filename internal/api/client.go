@@ -213,13 +213,19 @@ func (c *Client) FetchExchanges(ctx context.Context) ([]ExchangeMeta, error) {
 	var raw []struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
+		WorkingSchedules []struct {
+			ID int `json:"id"`
+		} `json:"workingSchedules"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
-	exchanges := make([]ExchangeMeta, len(raw))
-	for i, r := range raw {
-		exchanges[i] = ExchangeMeta{ID: r.ID, Name: r.Name}
+	// Flatten: each workingSchedule ID maps to its parent exchange name.
+	var exchanges []ExchangeMeta
+	for _, ex := range raw {
+		for _, ws := range ex.WorkingSchedules {
+			exchanges = append(exchanges, ExchangeMeta{ID: ws.ID, Name: ex.Name})
+		}
 	}
 	return exchanges, nil
 }
