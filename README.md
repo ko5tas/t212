@@ -142,7 +142,8 @@ All configuration is via environment variables (or `/etc/t212/config.env` in pro
 | `T212_API_KEY` | Yes | — | Trading 212 API key ID (shown when generating the key) |
 | `T212_API_SECRET` | Yes | — | Trading 212 API secret key (shown once at generation time) |
 | `T212_PORT` | No | `8080` | Port for the web server |
-| `SIGNAL_NUMBER` | No | — | Your phone number in E.164 format (`+447700…`). Omit to disable Signal notifications. |
+| `SIGNAL_NUMBER` | No | — | Sender number registered on signal-cli (E.164 format). Omit to disable Signal notifications. |
+| `SIGNAL_RECIPIENT` | No | `SIGNAL_NUMBER` | Recipient number that receives push notifications (E.164 format). Defaults to `SIGNAL_NUMBER` if not set. |
 | `SIGNAL_CLI_PATH` | No | `/usr/local/bin/signal-cli` | Path to the `signal-cli` binary |
 | `SIGNAL_CLI_CONFIG` | No | `/var/lib/t212/signal-cli` | signal-cli data directory (passed as `--config`) |
 | `T212_HOST` | No | `localhost` | Host for `t212 tui` to connect to (TUI subcommand only) |
@@ -168,7 +169,7 @@ sudo chmod 700 /etc/t212
 sudo cp deploy/config.env.example /etc/t212/config.env
 sudo chmod 0600 /etc/t212/config.env
 sudo chown root:root /etc/t212/config.env
-sudo nano /etc/t212/config.env   # fill in T212_API_KEY and SIGNAL_NUMBER
+sudo nano /etc/t212/config.env   # fill in T212_API_KEY, SIGNAL_NUMBER, SIGNAL_RECIPIENT
 ```
 
 ### 3. Deploy
@@ -192,7 +193,7 @@ Open `http://raspberrypi.local:8080` in a browser on the same LAN.
 
 ## Signal notifications (optional)
 
-Signal alerts are sent as a **linked device** on your own Signal account — the Pi sends messages to you from itself.
+A second phone number is registered on signal-cli and sends messages to your primary number, triggering real push notifications.
 
 ### One-time setup
 
@@ -202,31 +203,30 @@ Signal alerts are sent as a **linked device** on your own Signal account — the
 sudo apt install signal-cli openjdk-25-jre-headless
 ```
 
-2. **Link the Pi as a Signal device** (run as the `t212` service user):
+2. **Register a second number** on signal-cli (e.g. a dual-SIM secondary number):
 
 ```bash
-sudo -u t212 signal-cli --config /var/lib/t212/signal-cli link -n 'T212-Pi'
+sudo -u t212 signal-cli --config /var/lib/t212/signal-cli -u +SENDERNUMBER register
 ```
 
-This prints a `tsdevice:` URI. If `qrencode` is installed, pipe it to generate a scannable QR code:
+If a CAPTCHA is required, visit `https://signalcaptchas.org/registration/generate.html`, solve it, copy the `signalcaptcha://` URI, and re-run:
 
 ```bash
-sudo -u t212 signal-cli --config /var/lib/t212/signal-cli link -n 'T212-Pi' | qrencode -t ansiutf8
+sudo -u t212 signal-cli --config /var/lib/t212/signal-cli -u +SENDERNUMBER register --captcha 'signalcaptcha://...'
 ```
 
-Scan the QR with your phone: **Signal → Settings → Linked Devices → Link New Device**.
-
-Or from your build machine:
+Verify with the SMS code:
 
 ```bash
-make setup-signal PI_HOST=pi@raspberrypi.local
+sudo -u t212 signal-cli --config /var/lib/t212/signal-cli -u +SENDERNUMBER verify CODE
 ```
 
-3. **Set your Signal number** in `/etc/t212/config.env`:
+3. **Set both numbers** in `/etc/t212/config.env`:
 
 ```bash
 sudo nano /etc/t212/config.env
-# Set: SIGNAL_NUMBER=+447700000000
+# SIGNAL_NUMBER=+SENDERNUMBER      (registered on signal-cli)
+# SIGNAL_RECIPIENT=+YOURNUMBER     (your primary phone)
 ```
 
 4. **Restart the service:**
