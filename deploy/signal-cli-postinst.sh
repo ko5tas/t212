@@ -8,9 +8,8 @@ case "$1" in
             echo ""
             echo "================================================================"
             echo " WARNING: Java JRE not found."
-            echo " signal-cli requires Java 17+."
-            echo " Install via: dietpi-software install 196"
-            echo " Or:          sudo apt install openjdk-17-jre-headless"
+            echo " signal-cli requires Java 25+."
+            echo " Install via: sudo apt install openjdk-25-jre-headless"
             echo "================================================================"
             echo ""
         fi
