@@ -195,21 +195,44 @@ Signal alerts are sent as a **linked device** on your own Signal account — the
 
 ### One-time setup
 
-Install signal-cli from the t212 APT repo (if not already installed):
+1. **Install signal-cli and Java 25+** from the t212 APT repo:
 
 ```bash
-sudo apt install signal-cli
+sudo apt install signal-cli openjdk-25-jre-headless
 ```
 
-Then link the Pi as a Signal device:
+2. **Link the Pi as a Signal device** (run as the `t212` service user):
 
 ```bash
-# On the Pi, print a QR code:
+sudo -u t212 signal-cli --config /var/lib/t212/signal-cli link -n 'T212-Pi'
+```
+
+This prints a `tsdevice:` URI. If `qrencode` is installed, pipe it to generate a scannable QR code:
+
+```bash
+sudo -u t212 signal-cli --config /var/lib/t212/signal-cli link -n 'T212-Pi' | qrencode -t ansiutf8
+```
+
+Scan the QR with your phone: **Signal → Settings → Linked Devices → Link New Device**.
+
+Or from your build machine:
+
+```bash
 make setup-signal PI_HOST=pi@raspberrypi.local
-# Scan the QR with your phone: Signal → Settings → Linked Devices → Link New Device
 ```
 
-Set `SIGNAL_NUMBER` in `/etc/t212/config.env` to your number in E.164 format.
+3. **Set your Signal number** in `/etc/t212/config.env`:
+
+```bash
+sudo nano /etc/t212/config.env
+# Set: SIGNAL_NUMBER=+447700000000
+```
+
+4. **Restart the service:**
+
+```bash
+sudo systemctl restart t212
+```
 
 signal-cli is updated automatically via the APT repository (`sudo apt update && sudo apt upgrade`).
 
