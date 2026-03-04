@@ -28,6 +28,10 @@ func runServe() error {
 	}
 
 	signalNumber := os.Getenv("SIGNAL_NUMBER")
+	signalRecipient := os.Getenv("SIGNAL_RECIPIENT")
+	if signalRecipient == "" {
+		signalRecipient = signalNumber // backwards-compat: send to self
+	}
 	signalCLIPath := os.Getenv("SIGNAL_CLI_PATH")
 	if signalCLIPath == "" {
 		signalCLIPath = "/usr/local/bin/signal-cli"
@@ -62,7 +66,7 @@ func runServe() error {
 
 	var n poller.Notifier
 	if signalNumber != "" {
-		n = notifier.New(signalCLIPath, signalNumber, signalCLIConfig)
+		n = notifier.New(signalCLIPath, signalNumber, signalRecipient, signalCLIConfig)
 	}
 
 	p := poller.New(apiClient, s, h, threshold, n,

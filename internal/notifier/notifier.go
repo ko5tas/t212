@@ -7,17 +7,18 @@ import (
 )
 
 // Notifier sends Signal messages via a signal-cli subprocess.
-// The Pi must be registered as a linked device on the user's Signal account.
 type Notifier struct {
 	signalCLIPath string
 	configPath    string // --config directory (empty = signal-cli default)
-	number        string // sender = recipient (linked device on own account)
+	sender        string // -u account (registered on signal-cli)
+	recipient     string // destination number
 }
 
-// New creates a Notifier. signalCLIPath is the path to the signal-cli binary.
-// configPath is the --config directory (pass "" to use signal-cli's default).
-func New(signalCLIPath, number, configPath string) *Notifier {
-	return &Notifier{signalCLIPath: signalCLIPath, number: number, configPath: configPath}
+// New creates a Notifier. sender is the -u account registered on signal-cli,
+// recipient is the number that receives the message. configPath is the --config
+// directory (pass "" to use signal-cli's default).
+func New(signalCLIPath, sender, recipient, configPath string) *Notifier {
+	return &Notifier{signalCLIPath: signalCLIPath, sender: sender, recipient: recipient, configPath: configPath}
 }
 
 // Notify sends a Signal message when a position enters or exits the profit threshold.
@@ -35,7 +36,7 @@ func (n *Notifier) Notify(ticker string, entered bool, profitPerShare float64, c
 	if n.configPath != "" {
 		args = append(args, "--config", n.configPath)
 	}
-	args = append(args, "-u", n.number, "send", "-m", msg, n.number)
+	args = append(args, "-u", n.sender, "send", "-m", msg, n.recipient)
 
 	cmd := exec.Command(n.signalCLIPath, args...)
 
