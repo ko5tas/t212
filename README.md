@@ -52,7 +52,7 @@ sendNotifications → signal-cli subprocess → Signal message
 - A Trading 212 live account with an API key
 - Raspberry Pi 5 running DietPi (or any `linux/arm64` system)
 - `make`, `ssh`, `scp` on your build machine
-- (Optional) `signal-cli` installed on the Pi for notifications
+- (Optional) `signal-cli` for notifications — install via `sudo apt install signal-cli` after adding the APT repo
 
 ---
 
@@ -195,7 +195,13 @@ Signal alerts are sent as a **linked device** on your own Signal account — the
 
 ### One-time setup
 
-Install `signal-cli` on the Pi, then:
+Install signal-cli from the t212 APT repo (if not already installed):
+
+```bash
+sudo apt install signal-cli
+```
+
+Then link the Pi as a Signal device:
 
 ```bash
 # On the Pi, print a QR code:
@@ -205,6 +211,8 @@ make setup-signal PI_HOST=pi@raspberrypi.local
 
 Set `SIGNAL_NUMBER` in `/etc/t212/config.env` to your number in E.164 format.
 
+signal-cli is updated automatically via the APT repository (`sudo apt update && sudo apt upgrade`).
+
 ### Alert messages
 
 | Event | Message |
@@ -213,14 +221,6 @@ Set `SIGNAL_NUMBER` in `/etc/t212/config.env` to your number in E.164 format.
 | Position exits threshold | `📉 AAPL_US_EQ dropped below +£1/share profit` |
 
 Alerts are **edge-triggered**: you receive one message when a position crosses the boundary, not one every second while it stays there.
-
-### Updating signal-cli
-
-```bash
-make update-signal-cli PI_HOST=pi@raspberrypi.local
-```
-
-Downloads the latest release from GitHub, verifies the SHA256 checksum, and replaces the binary atomically.
 
 ---
 
@@ -237,7 +237,6 @@ Downloads the latest release from GitHub, verifies the SHA256 checksum, and repl
 | `make deploy` | Build + deploy to Pi via SSH/SCP |
 | `make setup-apt` | Add t212 APT repository on Pi for automatic updates |
 | `make setup-signal` | Register Pi as Signal linked device |
-| `make update-signal-cli` | Download and verify latest signal-cli release |
 | `make logs` | Tail systemd journal from Pi |
 | `make clean` | Remove build artifacts |
 
