@@ -12,8 +12,9 @@ description: |
 homepage: https://github.com/AsamK/signal-cli
 
 contents:
-  - src: ./signal-cli-dist/
+  - src: ./signal-cli-dist/**
     dst: /opt/signal-cli/
+    type: tree
 
   - dst: /usr/local/bin/signal-cli
     type: symlink
