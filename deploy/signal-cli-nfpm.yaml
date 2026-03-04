@@ -1,0 +1,23 @@
+name: signal-cli
+arch: arm64
+platform: linux
+version: "${SIGNAL_CLI_VERSION}"
+section: utils
+priority: optional
+maintainer: "t212 <noreply@github.com>"
+description: |
+  signal-cli repackaged for the t212 APT repository.
+  Command-line interface for the Signal messenger.
+  Upstream: https://github.com/AsamK/signal-cli
+homepage: https://github.com/AsamK/signal-cli
+
+contents:
+  - src: ./signal-cli-dist/
+    dst: /opt/signal-cli/
+
+  - dst: /usr/local/bin/signal-cli
+    type: symlink
+    src: /opt/signal-cli/bin/signal-cli
+
+scripts:
+  postinstall: ./deploy/signal-cli-postinst.sh
