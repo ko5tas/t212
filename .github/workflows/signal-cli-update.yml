@@ -86,6 +86,15 @@ jobs:
 
           tar -xzf native-lib.tar.gz
           mv libsignal_jni.so libsignal_jni_aarch64.so
+          # Remove non-ARM64 native libs to reduce package size
+          zip -d "$LIBSIGNAL_JAR" \
+            libsignal_jni_amd64.so \
+            signal_jni_amd64.dll \
+            libsignal_jni_amd64.dylib \
+            libsignal_jni_aarch64.dylib \
+            2>/dev/null || true
+
+          # Inject the aarch64 Linux native lib
           zip -j "$LIBSIGNAL_JAR" libsignal_jni_aarch64.so
           echo "Injected libsignal_jni_aarch64.so into $(basename $LIBSIGNAL_JAR)"
           rm -f native-lib.tar.gz libsignal_jni_aarch64.so
