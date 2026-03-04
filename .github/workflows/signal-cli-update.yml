@@ -54,6 +54,41 @@ jobs:
           echo "Extracted $(find signal-cli-dist -type f | wc -l) files"
           ls signal-cli-dist/bin/
 
+      - name: Inject aarch64 native library
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LIBSIGNAL_JAR=$(ls signal-cli-dist/lib/libsignal-client-*.jar)
+          LIBSIGNAL_VERSION=$(basename "$LIBSIGNAL_JAR" | sed 's/libsignal-client-//; s/\.jar//')
+          echo "Bundled libsignal-client version: ${LIBSIGNAL_VERSION}"
+
+          # Skip if aarch64 lib already present
+          if unzip -l "$LIBSIGNAL_JAR" | grep -q "libsignal_jni_aarch64.so"; then
+            echo "aarch64 native lib already in JAR, skipping"
+            exit 0
+          fi
+
+          # Try exact version, then fall back to nearest available
+          ASSET="libsignal_jni.so-v${LIBSIGNAL_VERSION}-aarch64-unknown-linux-gnu.tar.gz"
+          URL="https://github.com/exquo/signal-libs-build/releases/download/libsignal_v${LIBSIGNAL_VERSION}/${ASSET}"
+
+          if ! curl -fsSL -o native-lib.tar.gz "${URL}" 2>/dev/null; then
+            echo "Exact version not available, finding nearest aarch64 build..."
+            FALLBACK_TAG=$(gh api repos/exquo/signal-libs-build/releases --paginate \
+              --jq '[.[] | select(.assets[]?.name | contains("aarch64-unknown-linux-gnu"))] | .[0].tag_name')
+            FALLBACK_VERSION="${FALLBACK_TAG#libsignal_v}"
+            echo "::warning::Using fallback libsignal native v${FALLBACK_VERSION} (wanted v${LIBSIGNAL_VERSION})"
+            ASSET="libsignal_jni.so-v${FALLBACK_VERSION}-aarch64-unknown-linux-gnu.tar.gz"
+            curl -fsSL -o native-lib.tar.gz \
+              "https://github.com/exquo/signal-libs-build/releases/download/${FALLBACK_TAG}/${ASSET}"
+          fi
+
+          tar -xzf native-lib.tar.gz
+          mv libsignal_jni.so libsignal_jni_aarch64.so
+          zip -j "$LIBSIGNAL_JAR" libsignal_jni_aarch64.so
+          echo "Injected libsignal_jni_aarch64.so into $(basename $LIBSIGNAL_JAR)"
+          rm -f native-lib.tar.gz libsignal_jni_aarch64.so
+
       - name: Install nfpm
         run: |
           curl -fsSL https://github.com/goreleaser/nfpm/releases/download/v2.45.0/nfpm_2.45.0_Linux_x86_64.tar.gz \
