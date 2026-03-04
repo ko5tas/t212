@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/ko5tas/t212/internal/api"
-	"github.com/ko5tas/t212/internal/filter"
 	"github.com/ko5tas/t212/internal/history"
 	"github.com/ko5tas/t212/internal/hub"
 	"github.com/ko5tas/t212/internal/store"
@@ -29,7 +29,9 @@ type Poller struct {
 	hub          *hub.Hub
 	threshold    float64
 	notifier     Notifier
+	mu           sync.Mutex // guards prevAbove, prevBelow
 	prevAbove    map[string]bool
+	prevBelow    map[string]bool
 	interval     time.Duration
 	historyStore *history.Store
 	refreshCh    chan string // ticker or "" for all
@@ -57,6 +59,7 @@ func New(client *api.Client, s *store.Store, h *hub.Hub, threshold float64, n No
 		threshold: threshold,
 		notifier:  n,
 		prevAbove: make(map[string]bool),
+		prevBelow: make(map[string]bool),
 		interval:  pollInterval,
 	}
 	for _, o := range opts {
@@ -121,9 +124,8 @@ func (p *Poller) poll(ctx context.Context) {
 
 	p.store.Set(positions)
 
-	filtered := filter.Apply(positions, p.threshold)
-	p.sendNotifications(filtered)
 	p.attachReturns(positions)
+	p.sendNotifications(positions)
 	closed := p.buildClosedPositions(positions)
 	p.broadcast(positions, closed)
 }
@@ -167,36 +169,56 @@ func (p *Poller) broadcast(filtered []api.Position, closed []api.ClosedPosition)
 	p.hub.Broadcast(b)
 }
 
-func (p *Poller) sendNotifications(filtered []api.Position) {
+func (p *Poller) sendNotifications(positions []api.Position) {
 	if p.notifier == nil {
 		return
 	}
 
-	nowAbove := make(map[string]api.Position, len(filtered))
-	for _, pos := range filtered {
-		nowAbove[pos.Ticker] = pos
-	}
-
-	// Detect edge: entered threshold.
-	for ticker, pos := range nowAbove {
-		if !p.prevAbove[ticker] {
-			p.notifier.Notify(ticker, true, pos.ProfitPerShare, pos.CurrencySymbol())
+	nowAbove := make(map[string]api.Position)
+	nowBelow := make(map[string]api.Position)
+	for _, pos := range positions {
+		if pos.Returns == nil {
+			continue
+		}
+		if pos.CurrentValueGBP > pos.Returns.TotalBought+p.threshold {
+			nowAbove[pos.Ticker] = pos
+		}
+		if pos.Returns.TotalBought > 0 && pos.CurrentValueGBP < pos.Returns.TotalBought*0.90 {
+			nowBelow[pos.Ticker] = pos
 		}
 	}
 
-	// Detect edge: exited threshold.
-	for ticker := range p.prevAbove {
-		if _, ok := nowAbove[ticker]; !ok {
-			p.notifier.Notify(ticker, false, 0, "")
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Detect edge: crossed above profit threshold.
+	for ticker, pos := range nowAbove {
+		if !p.prevAbove[ticker] {
+			profit := pos.CurrentValueGBP - pos.Returns.TotalBought
+			p.notifier.Notify(ticker, pos.Name, true, profit)
+		}
+	}
+
+	// Detect edge: dropped 10% below total bought.
+	for ticker, pos := range nowBelow {
+		if !p.prevBelow[ticker] {
+			loss := pos.Returns.TotalBought - pos.CurrentValueGBP
+			p.notifier.Notify(ticker, pos.Name, false, loss)
 		}
 	}
 
 	// Update previous state.
-	newPrev := make(map[string]bool, len(nowAbove))
+	newAbove := make(map[string]bool, len(nowAbove))
 	for ticker := range nowAbove {
-		newPrev[ticker] = true
+		newAbove[ticker] = true
 	}
-	p.prevAbove = newPrev
+	p.prevAbove = newAbove
+
+	newBelow := make(map[string]bool, len(nowBelow))
+	for ticker := range nowBelow {
+		newBelow[ticker] = true
+	}
+	p.prevBelow = newBelow
 }
 
 func (p *Poller) attachReturns(positions []api.Position) {

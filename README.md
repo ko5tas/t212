@@ -12,7 +12,7 @@ Designed to run as a systemd service on a Raspberry Pi 5 (DietPi, `linux/arm64`)
 - **Profit filter** — shows only positions where `currentPrice − averagePrice > £1.00` per share
 - **Browser Web UI** — auto-updating table pushed over WebSocket; no page refresh needed
 - **Terminal TUI** — bubbletea-based table, run over SSH from any machine on the LAN
-- **Signal notifications** — edge-triggered alerts when a position enters or exits the threshold
+- **Signal notifications** — edge-triggered alerts for profit (above £1 gain) and loss (10% below total invested)
 - **Zero persistence** — no database; all state is in-memory and lost on restart
 
 ---
@@ -237,14 +237,16 @@ sudo systemctl restart t212
 
 signal-cli is updated automatically via the APT repository (`sudo apt update && sudo apt upgrade`).
 
-### Alert messages
+### Alert rules
 
-| Event | Message |
-|---|---|
-| Position enters threshold | `📈 AAPL_US_EQ crossed +£1/share profit (now +£9.30)` |
-| Position exits threshold | `📉 AAPL_US_EQ dropped below +£1/share profit` |
+Two independent edge-triggered alerts:
 
-Alerts are **edge-triggered**: you receive one message when a position crosses the boundary, not one every second while it stays there.
+| Alert | Condition | Message |
+|---|---|---|
+| Profit | `currentValueGBP > totalBought + £1` | `🟢 Apple Inc (AAPL_US_EQ) is now +£25.50 profit!` |
+| Loss | `currentValueGBP < totalBought × 0.90` | `🔴 Tesla Inc (TSLA_US_EQ) is down -£12.30 (10% loss)` |
+
+Alerts are **edge-triggered**: you receive one message when a position crosses the boundary, not one per poll while it stays there. Each alert fires independently — a position can trigger both if it first profits and later drops.
 
 ---
 
@@ -276,10 +278,10 @@ Override the Pi host: `make deploy PI_HOST=user@192.168.1.10`
 | Polling rate | 1 req/min | Conservative interval to avoid 429s from T212 |
 | WebSocket fan-out | Buffered channels (size 8), slow subscribers skipped | Prevents one slow client from blocking the broadcast loop |
 | No database | In-memory store only | Data is live prices; stale data on restart is fine |
-| Signal transport | Linked device (not a separate Signal account) | Simpler setup; no secondary phone number needed |
+| Signal transport | Second number registered on signal-cli, sends to primary | Real push notifications; no "Note to Self" limitation |
 | TLS | 1.3 minimum for all outbound connections | Enforced via `tls.Config{MinVersion: tls.VersionTLS13}` |
 | Profit field | Computed from `currentPrice − averagePrice` after fetch | T212 API returns raw prices; `ProfitPerShare` and `MarketValue` are derived |
-| Notifications | Edge-detected via `prevAbove map[string]bool` | One alert on crossing, not one per poll while the position stays above |
+| Notifications | Edge-detected via `prevAbove` and `prevBelow` maps | Two independent alerts (profit/loss); one message per crossing, not per poll |
 | Local transport | HTTP on LAN | HTTPS/Let's Encrypt deferred to a future iteration |
 
 ---

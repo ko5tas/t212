@@ -24,12 +24,13 @@ func New(signalCLIPath, sender, recipient, configPath string) *Notifier {
 // Notify sends a Signal message when a position enters or exits the profit threshold.
 // entered=true means the position just crossed above the threshold.
 // entered=false means it just dropped below.
-func (n *Notifier) Notify(ticker string, entered bool, profitPerShare float64, currencySymbol string) {
+// profit is the total GBP profit (currentValueGBP - totalBought).
+func (n *Notifier) Notify(ticker, name string, entered bool, amount float64) {
 	var msg string
 	if entered {
-		msg = fmt.Sprintf("📈 %s crossed +%s1/share profit (now +%s%.2f)", ticker, currencySymbol, currencySymbol, profitPerShare)
+		msg = fmt.Sprintf("🟢 %s (%s) is now +£%.2f profit!", name, ticker, amount)
 	} else {
-		msg = fmt.Sprintf("📉 %s dropped below +1/share profit", ticker)
+		msg = fmt.Sprintf("🔴 %s (%s) is down -£%.2f (10%% loss)", name, ticker, amount)
 	}
 
 	args := []string{}

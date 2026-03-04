@@ -148,16 +148,16 @@ type mockNotifier struct {
 }
 
 type notifyCall struct {
-	ticker         string
-	entered        bool
-	profit         float64
-	currencySymbol string
+	ticker  string
+	name    string
+	entered bool
+	profit  float64
 }
 
-func (m *mockNotifier) Notify(ticker string, entered bool, profitPerShare float64, currencySymbol string) {
+func (m *mockNotifier) Notify(ticker, name string, entered bool, profit float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.calls = append(m.calls, notifyCall{ticker, entered, profitPerShare, currencySymbol})
+	m.calls = append(m.calls, notifyCall{ticker, name, entered, profit})
 }
 
 func (m *mockNotifier) Calls() []notifyCall {
@@ -197,14 +197,25 @@ func drainBroadcasts(t *testing.T, ch <-chan []byte, n int, timeout time.Duratio
 }
 
 var (
-	posBelow = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50}} // profit 0.50 ≤ 1.00
-	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00}} // profit 10.00 > 1.00
+	// currentValueGBP 100.50, totalBought 100.00 → profit 0.50 (no notification)
+	posNeutral = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50, CurrentValueGBP: 100.50}}
+	// currentValueGBP 110.00, totalBought 100.00 → profit 10.00 > 1.00 (green)
+	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00, CurrentValueGBP: 110.00}}
+	// currentValueGBP 89.00, totalBought 100.00 → 11% loss (red)
+	posLoss = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 89.00, CurrentValueGBP: 89.00}}
 )
 
+// notifyHistoryStore returns a history store pre-loaded with TotalBought for AAPL_US_EQ.
+func notifyHistoryStore() *history.Store {
+	hs := history.NewStore()
+	hs.Set("AAPL_US_EQ", api.ReturnInfo{TotalBought: 100.00})
+	return hs
+}
+
 func TestSendNotifications_EnterThreshold(t *testing.T) {
-	// Poll 1: below threshold → no notification.
-	// Poll 2: above threshold → enter notification.
-	srv := makeSequenceServer(t, [][]api.Position{posBelow, posAbove})
+	// With history store, Run() fires a background goroutine that does an extra
+	// poll after refreshHistory. Sequence: poll(below), bg-poll(below), tick-poll(above).
+	srv := makeSequenceServer(t, [][]api.Position{posNeutral, posNeutral, posAbove})
 	defer srv.Close()
 
 	s := store.New()
@@ -213,13 +224,15 @@ func TestSendNotifications_EnterThreshold(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond)
+	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond,
+		poller.WithHistoryStore(notifyHistoryStore()),
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go p.Run(ctx)
 
-	drainBroadcasts(t, broadcastCh, 2, 3*time.Second)
+	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
 	cancel()
 
 	calls := n.Calls()
@@ -234,10 +247,10 @@ func TestSendNotifications_EnterThreshold(t *testing.T) {
 	}
 }
 
-func TestSendNotifications_ExitThreshold(t *testing.T) {
-	// Poll 1: above threshold → enter notification.
-	// Poll 2: below threshold → exit notification.
-	srv := makeSequenceServer(t, [][]api.Position{posAbove, posBelow})
+func TestSendNotifications_LossThreshold(t *testing.T) {
+	// Sequence: poll(neutral), bg-poll(neutral), tick-poll(loss 11%).
+	// Expected: 1 red notification for 10% loss.
+	srv := makeSequenceServer(t, [][]api.Position{posNeutral, posNeutral, posLoss})
 	defer srv.Close()
 
 	s := store.New()
@@ -246,35 +259,35 @@ func TestSendNotifications_ExitThreshold(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond)
+	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond,
+		poller.WithHistoryStore(notifyHistoryStore()),
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go p.Run(ctx)
 
-	drainBroadcasts(t, broadcastCh, 2, 3*time.Second)
+	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
 	cancel()
 
 	calls := n.Calls()
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 notifications (enter+exit), got %d: %+v", len(calls), calls)
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 notification (loss), got %d: %+v", len(calls), calls)
 	}
-	if !calls[0].entered {
-		t.Errorf("call[0] should be enter, got: %+v", calls[0])
+	if calls[0].entered {
+		t.Errorf("call[0] should be loss (entered=false), got: %+v", calls[0])
 	}
-	if calls[1].entered {
-		t.Errorf("call[1] should be exit, got: %+v", calls[1])
+	if calls[0].ticker != "AAPL_US_EQ" {
+		t.Errorf("loss notification ticker mismatch: %+v", calls[0])
 	}
-	if calls[1].ticker != "AAPL_US_EQ" {
-		t.Errorf("exit notification ticker mismatch: %+v", calls[1])
+	if calls[0].profit != 11.00 {
+		t.Errorf("expected loss 11.00, got %v", calls[0].profit)
 	}
 }
 
 func TestSendNotifications_NoDoubleNotifyOnStay(t *testing.T) {
-	// Poll 1: above → enter notification.
-	// Poll 2: still above → no additional notification.
-	// Poll 3: still above → no additional notification.
-	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posAbove})
+	// Sequence: poll(above), bg-poll(above), tick-poll(above), tick-poll(above).
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posAbove, posAbove})
 	defer srv.Close()
 
 	s := store.New()
@@ -283,13 +296,15 @@ func TestSendNotifications_NoDoubleNotifyOnStay(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond)
+	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond,
+		poller.WithHistoryStore(notifyHistoryStore()),
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	go p.Run(ctx)
 
-	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
+	drainBroadcasts(t, broadcastCh, 4, 3*time.Second)
 	cancel()
 
 	calls := n.Calls()
@@ -349,12 +364,10 @@ func TestPoller_BroadcastIncludesReturns(t *testing.T) {
 	}
 }
 
-func TestSendNotifications_Oscillate(t *testing.T) {
-	// Poll 1: above → enter notification.
-	// Poll 2: below → exit notification.
-	// Poll 3: above → enter notification again.
-	// Expected: 3 notifications total.
-	srv := makeSequenceServer(t, [][]api.Position{posAbove, posBelow, posAbove})
+func TestSendNotifications_ProfitToNeutralNoRedAlert(t *testing.T) {
+	// Sequence: poll(above), bg-poll(above), tick-poll(neutral).
+	// Dropping from profit to neutral should NOT trigger a red alert (not a 10% loss).
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posNeutral})
 	defer srv.Close()
 
 	s := store.New()
@@ -363,9 +376,11 @@ func TestSendNotifications_Oscillate(t *testing.T) {
 	defer unsub()
 
 	n := &mockNotifier{}
-	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond)
+	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond,
+		poller.WithHistoryStore(notifyHistoryStore()),
+	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go p.Run(ctx)
 
@@ -373,16 +388,45 @@ func TestSendNotifications_Oscillate(t *testing.T) {
 	cancel()
 
 	calls := n.Calls()
-	if len(calls) != 3 {
-		t.Fatalf("expected 3 notifications, got %d: %+v", len(calls), calls)
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 notification (enter only, no red alert), got %d: %+v", len(calls), calls)
 	}
 	if !calls[0].entered {
-		t.Errorf("call[0] should be enter, got: %+v", calls[0])
+		t.Errorf("sole notification should be enter, got: %+v", calls[0])
+	}
+}
+
+func TestSendNotifications_ProfitThenLoss(t *testing.T) {
+	// Sequence: poll(above), bg-poll(above), tick-poll(loss).
+	// Expected: green enter + red loss = 2 notifications.
+	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posLoss})
+	defer srv.Close()
+
+	s := store.New()
+	h := hub.New()
+	broadcastCh, unsub := h.Subscribe()
+	defer unsub()
+
+	n := &mockNotifier{}
+	p := poller.NewForTesting(api.NewClient("test-key", "test-secret", srv.URL, srv.Client()), s, h, 1.00, n, 50*time.Millisecond,
+		poller.WithHistoryStore(notifyHistoryStore()),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go p.Run(ctx)
+
+	drainBroadcasts(t, broadcastCh, 3, 3*time.Second)
+	cancel()
+
+	calls := n.Calls()
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 notifications (enter+loss), got %d: %+v", len(calls), calls)
+	}
+	if !calls[0].entered {
+		t.Errorf("call[0] should be enter (green), got: %+v", calls[0])
 	}
 	if calls[1].entered {
-		t.Errorf("call[1] should be exit, got: %+v", calls[1])
-	}
-	if !calls[2].entered {
-		t.Errorf("call[2] should be enter (re-entry), got: %+v", calls[2])
+		t.Errorf("call[1] should be loss (red), got: %+v", calls[1])
 	}
 }
