@@ -44,7 +44,7 @@ jobs:
           VERSION: ${{ needs.check.outputs.latest }}
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          TARBALL="signal-cli-${CLEAN_VERSION}-Linux.tar.gz"
+          TARBALL="signal-cli-${CLEAN_VERSION}-Linux-client.tar.gz"
           URL="https://github.com/AsamK/signal-cli/releases/download/${VERSION}/${TARBALL}"
           echo "Downloading ${URL}..."
           curl -fsSL -o "${TARBALL}" "${URL}"
