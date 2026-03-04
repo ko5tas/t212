@@ -141,6 +141,144 @@ func TestClient_FetchPositions_GBXConversion(t *testing.T) {
 	}
 }
 
+func TestClient_FetchInstruments(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v0/equity/metadata/instruments" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"ticker": "AAPL_US_EQ", "currencyCode": "USD", "workingScheduleId": 1},
+			{"ticker": "LLOY_EQ", "currencyCode": "GBX", "workingScheduleId": 2},
+			{"ticker": "AMp_EQ", "currencyCode": "EUR", "workingScheduleId": 3},
+		})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	instruments, err := c.FetchInstruments(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(instruments) != 3 {
+		t.Fatalf("expected 3 instruments, got %d", len(instruments))
+	}
+	if instruments[2].Ticker != "AMp_EQ" {
+		t.Errorf("ticker: got %q, want AMp_EQ", instruments[2].Ticker)
+	}
+	if instruments[2].CurrencyCode != "EUR" {
+		t.Errorf("currency: got %q, want EUR", instruments[2].CurrencyCode)
+	}
+	if instruments[2].WorkingScheduleID != 3 {
+		t.Errorf("workingScheduleId: got %d, want 3", instruments[2].WorkingScheduleID)
+	}
+}
+
+func TestClient_FetchExchanges(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v0/equity/metadata/exchanges" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"id": 1, "name": "NYSE"},
+			{"id": 2, "name": "London Stock Exchange"},
+			{"id": 3, "name": "Euronext Paris"},
+		})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	exchanges, err := c.FetchExchanges(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(exchanges) != 3 {
+		t.Fatalf("expected 3 exchanges, got %d", len(exchanges))
+	}
+	if exchanges[2].Name != "Euronext Paris" {
+		t.Errorf("name: got %q, want Euronext Paris", exchanges[2].Name)
+	}
+}
+
+func TestClient_LoadMetadata_PopulatesCache(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/equity/metadata/instruments":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"ticker": "AMp_EQ", "currencyCode": "EUR", "workingScheduleId": 3},
+				{"ticker": "LLOY_EQ", "currencyCode": "GBX", "workingScheduleId": 2},
+			})
+		case "/api/v0/equity/metadata/exchanges":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 2, "name": "London Stock Exchange"},
+				{"id": 3, "name": "Euronext Paris"},
+			})
+		case "/api/v0/equity/positions":
+			w.Header().Set("x-ratelimit-remaining", "59")
+			w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
+			json.NewEncoder(w).Encode([]map[string]any{
+				{
+					"instrument":       map[string]any{"ticker": "AMp_EQ", "name": "Dassault Aviation"},
+					"quantity":         1.0,
+					"averagePricePaid": 200.0,
+					"currentPrice":     210.0,
+					"walletImpact":     map[string]any{"currentValue": 180.0},
+				},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	if err := c.LoadMetadata(context.Background()); err != nil {
+		t.Fatalf("LoadMetadata: %v", err)
+	}
+
+	positions, _, err := c.FetchPositions(context.Background())
+	if err != nil {
+		t.Fatalf("FetchPositions: %v", err)
+	}
+	if len(positions) != 1 {
+		t.Fatalf("expected 1 position, got %d", len(positions))
+	}
+	p := positions[0]
+	if p.Currency != "EUR" {
+		t.Errorf("currency: got %q, want EUR (from metadata, not inferCurrency)", p.Currency)
+	}
+	if p.Exchange != "Euronext Paris" {
+		t.Errorf("exchange: got %q, want Euronext Paris", p.Exchange)
+	}
+}
+
+func TestClient_FetchPositions_FallbackWithoutMetadata(t *testing.T) {
+	// Without LoadMetadata, FetchPositions falls back to inferCurrency.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("x-ratelimit-remaining", "59")
+		w.Header().Set("x-ratelimit-reset", strconv.FormatInt(time.Now().Add(time.Second).Unix(), 10))
+		json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"instrument":       map[string]any{"ticker": "AAPL_US_EQ", "name": "Apple"},
+				"quantity":         1.0,
+				"averagePricePaid": 173.20,
+				"currentPrice":     182.50,
+				"walletImpact":     map[string]any{"currentValue": 150.0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	positions, _, err := c.FetchPositions(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if positions[0].Currency != "USD" {
+		t.Errorf("currency: got %q, want USD (inferCurrency fallback)", positions[0].Currency)
+	}
+	if positions[0].Exchange != "" {
+		t.Errorf("exchange: got %q, want empty (no metadata)", positions[0].Exchange)
+	}
+}
+
 func TestClient_FetchOrderHistory(t *testing.T) {
 	page := 0
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

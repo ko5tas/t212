@@ -35,6 +35,7 @@ const (
 	SortAvgPrice
 	SortProfitPerShare
 	SortMarketValue
+	SortExchange
 	sortColumnCount // sentinel
 )
 
@@ -61,6 +62,8 @@ func (s SortColumn) String() string {
 		return "PROFIT/SHR"
 	case SortMarketValue:
 		return "MKT VALUE"
+	case SortExchange:
+		return "EXCHANGE"
 	}
 	return ""
 }
@@ -219,6 +222,8 @@ func posLess(a, b api.Position, col SortColumn) bool {
 		return a.ProfitPerShare < b.ProfitPerShare
 	case SortMarketValue:
 		return a.CurrentValueGBP < b.CurrentValueGBP
+	case SortExchange:
+		return a.Exchange < b.Exchange
 	}
 	return false
 }
@@ -265,6 +270,7 @@ func (m Model) View() string {
 			m.renderHeader("TICKER", SortTicker, 16) + " " +
 			m.renderHeader("NAME", SortName, 24) + " " +
 			m.renderHeader("MKT VALUE", SortMarketValue, 20) + " " +
+			m.renderHeader("EXCHANGE", SortExchange, 16) + " " +
 			m.renderHeader("RETURN", SortReturn, 10) + " " +
 			m.renderHeader("RETURN %", SortReturnPct, 10) + " " +
 			m.renderHeader("NET ROI %", SortNetROI, 10) + " " +
@@ -319,12 +325,14 @@ func (m Model) View() string {
 			if p.Returns != nil && p.CurrentValueGBP > p.Returns.TotalBought+1 {
 				mvStr = profitBlinkStyle.Render(mvStr)
 			}
-			out += fmt.Sprintf("%s%3d %-16s %-24s %s %s %10.4f %s%12.2f %s%11.2f %s\n",
+			exchStr := fmt.Sprintf("%-16s", p.Exchange)
+			out += fmt.Sprintf("%s%3d %-16s %-24s %s %s %s %10.4f %s%12.2f %s%11.2f %s\n",
 				marker,
 				i+1,
 				p.Ticker,
 				name,
 				mvStr,
+				exchStr,
 				retStr,
 				p.Quantity,
 				sym, p.CurrentPrice,
@@ -347,10 +355,11 @@ func (m Model) View() string {
 			totalPctStr = lossStyle.Render(totalPctStr)
 		}
 		totalValGBPStr := fmt.Sprintf("%-20s", fmt.Sprintf("£%.2f", totalValueGBP))
-		totalsLine := fmt.Sprintf("     %-16s %-24s %s %s %s %10s %10s %13s %12s %14s",
+		totalsLine := fmt.Sprintf("     %-16s %-24s %s %-16s %s %s %10s %10s %13s %12s %14s",
 			"TOTAL",
 			"",
 			totalValGBPStr,
+			"",
 			totalRetStr,
 			totalPctStr,
 			"", "", "", "", "",

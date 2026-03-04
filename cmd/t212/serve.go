@@ -47,6 +47,9 @@ func runServe() error {
 	)
 
 	apiClient := api.NewClient(apiKey, apiSecret, "https://live.trading212.com", nil)
+	if err := apiClient.LoadMetadata(context.Background()); err != nil {
+		slog.Warn("failed to load instrument metadata", "err", err)
+	}
 	s := store.New()
 	h := hub.New()
 

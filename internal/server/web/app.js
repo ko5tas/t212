@@ -42,6 +42,7 @@
       case 'averagePrice': return p.averagePrice || 0;
       case 'profitPerShare': return p.profitPerShare || 0;
       case 'marketValue': return p.currentValueGBP || 0;
+      case 'exchange': return p.exchange || '';
       default: return 0;
     }
   }
@@ -140,6 +141,7 @@
           '<td class="' + mvCls + '">' + fmt(p.currentValueGBP || 0, 'GBP') +
             (c !== 'GBP' ? ' <span class="mv-native">(' + fmt(p.marketValue, c) + ')</span>' : '') +
           '</td>' +
+          '<td>' + (p.exchange || '') + '</td>' +
           '<td><button class="btn-refresh-row" title="Refresh ' + p.ticker + '">&#x21bb;</button></td>' +
           '<td class="' + retCls + '">' + retVal + '</td>' +
           '<td class="' + pctCls + '">' + retPct + '</td>' +
@@ -163,6 +165,7 @@
         '<td><strong>TOTAL</strong></td>' +
         '<td></td>' +
         '<td><strong>' + fmt(totalValueGBP, 'GBP') + '</strong></td>' +
+        '<td></td>' +
         '<td></td>' +
         '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
         '<td class="' + totCls + '"><strong>' + totalRetPct.toFixed(1) + '%</strong></td>' +

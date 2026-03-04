@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,15 +17,19 @@ const (
 	positionsPath       = "/api/v0/equity/positions"
 	orderHistoryPath    = "/api/v0/equity/history/orders"
 	dividendHistoryPath = "/api/v0/equity/history/dividends"
+	instrumentsPath     = "/api/v0/equity/metadata/instruments"
+	exchangesPath       = "/api/v0/equity/metadata/exchanges"
 	historyPageLimit    = 50
 	historyRateDelay    = 11 * time.Second // stay under 6 req/min
 )
 
 // Client is a Trading 212 API client.
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	authHeader string
+	httpClient  *http.Client
+	baseURL     string
+	authHeader  string
+	instruments map[string]InstrumentMeta // ticker → metadata
+	exchanges   map[int]string            // workingScheduleId → exchange name
 }
 
 // NewClient creates a Client. apiKeyID and apiSecret are combined as HTTP Basic auth.
@@ -92,7 +97,19 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 	for i, r := range raw {
 		avg := r.AveragePrice
 		curr := r.CurrentPrice
-		currency := inferCurrency(r.Instrument.Ticker)
+
+		currency := ""
+		exchange := ""
+		if meta, ok := c.instruments[r.Instrument.Ticker]; ok {
+			currency = meta.CurrencyCode
+			if name, ok := c.exchanges[meta.WorkingScheduleID]; ok {
+				exchange = name
+			}
+		}
+		if currency == "" {
+			currency = inferCurrency(r.Instrument.Ticker) // fallback
+		}
+
 		if currency == "GBX" {
 			avg /= 100
 			curr /= 100
@@ -102,6 +119,7 @@ func (c *Client) FetchPositions(ctx context.Context) ([]Position, RateLimitInfo,
 			Ticker:          r.Instrument.Ticker,
 			Name:            r.Instrument.Name,
 			Currency:        currency,
+			Exchange:        exchange,
 			Quantity:        r.Quantity,
 			AveragePrice:    avg,
 			CurrentPrice:    curr,
@@ -145,6 +163,93 @@ func parseRateLimit(resp *http.Response) RateLimitInfo {
 		Remaining: remaining,
 		Reset:     time.Unix(resetUnix, 0),
 	}
+}
+
+// FetchInstruments calls GET /api/v0/equity/metadata/instruments and returns
+// metadata for all instruments.
+func (c *Client) FetchInstruments(ctx context.Context) ([]InstrumentMeta, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+instrumentsPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", c.authHeader)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	var instruments []InstrumentMeta
+	if err := json.NewDecoder(resp.Body).Decode(&instruments); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return instruments, nil
+}
+
+// FetchExchanges calls GET /api/v0/equity/metadata/exchanges and returns
+// exchange metadata extracted from the workingSchedules array.
+func (c *Client) FetchExchanges(ctx context.Context) ([]ExchangeMeta, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+exchangesPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", c.authHeader)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	var raw []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	exchanges := make([]ExchangeMeta, len(raw))
+	for i, r := range raw {
+		exchanges[i] = ExchangeMeta{ID: r.ID, Name: r.Name}
+	}
+	return exchanges, nil
+}
+
+// LoadMetadata fetches instrument and exchange metadata and caches it on the
+// client for use in FetchPositions. Failures are logged but not fatal — the
+// client falls back to inferCurrency when metadata is unavailable.
+func (c *Client) LoadMetadata(ctx context.Context) error {
+	instruments, err := c.FetchInstruments(ctx)
+	if err != nil {
+		slog.Warn("failed to fetch instruments metadata", "err", err)
+		return nil
+	}
+	c.instruments = make(map[string]InstrumentMeta, len(instruments))
+	for _, inst := range instruments {
+		c.instruments[inst.Ticker] = inst
+	}
+
+	exchanges, err := c.FetchExchanges(ctx)
+	if err != nil {
+		slog.Warn("failed to fetch exchanges metadata", "err", err)
+		return nil
+	}
+	c.exchanges = make(map[int]string, len(exchanges))
+	for _, ex := range exchanges {
+		c.exchanges[ex.ID] = ex.Name
+	}
+
+	slog.Info("loaded instrument metadata", "instruments", len(c.instruments), "exchanges", len(c.exchanges))
+	return nil
 }
 
 // FetchOrderHistory fetches all order fills, paginating automatically.

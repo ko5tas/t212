@@ -247,8 +247,8 @@ func TestModel_SortCycleColumn(t *testing.T) {
 	// Press 's' to cycle to next column
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	model := m2.(tui.Model)
-	if model.SortCol() != tui.SortTicker {
-		t.Errorf("sort column after s should be Ticker (wraps from MarketValue), got %v", model.SortCol())
+	if model.SortCol() != tui.SortExchange {
+		t.Errorf("sort column after s should be Exchange (next after MarketValue), got %v", model.SortCol())
 	}
 }
 

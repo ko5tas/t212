@@ -10,6 +10,7 @@ type Position struct {
 	AveragePrice    float64 `json:"averagePrice"`
 	CurrentPrice    float64 `json:"currentPrice"`
 	CurrentValueGBP float64 `json:"currentValueGBP"`
+	Exchange        string  `json:"exchange"`
 	ProfitPerShare  float64 `json:"profitPerShare"`
 	MarketValue     float64     `json:"marketValue"`
 	Returns         *ReturnInfo `json:"returns,omitempty"`
