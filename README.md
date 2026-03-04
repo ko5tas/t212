@@ -1,6 +1,6 @@
 # t212
 
-A self-hosted dashboard for Trading 212 that polls your live portfolio every second, filters positions where profit-per-share exceeds £1, and surfaces them via a browser Web UI, a terminal TUI, and Signal notifications.
+A self-hosted dashboard for Trading 212 that polls your live portfolio once per minute, computes returns (including sold positions and dividends), and surfaces everything via a browser Web UI, a terminal TUI, and Signal notifications.
 
 Designed to run as a systemd service on a Raspberry Pi 5 (DietPi, `linux/arm64`).
 
@@ -8,9 +8,10 @@ Designed to run as a systemd service on a Raspberry Pi 5 (DietPi, `linux/arm64`)
 
 ## Features
 
-- **Live position feed** — polls `GET /api/v0/equity/positions` at the T212 rate limit (1 req/s)
-- **Profit filter** — shows only positions where `currentPrice − averagePrice > £1.00` per share
-- **Browser Web UI** — auto-updating table pushed over WebSocket; no page refresh needed
+- **Live position feed** — polls `GET /api/v0/equity/positions` once per minute
+- **Return tracking** — computes per-position return including sold shares and dividends
+- **Closed positions** — separate tab showing fully sold instruments with final return
+- **Browser Web UI** — auto-updating table pushed over WebSocket; clickable column headers for sorting
 - **Terminal TUI** — bubbletea-based table, run over SSH from any machine on the LAN
 - **Signal notifications** — edge-triggered alerts for profit (above £1 gain) and loss (10% below total invested)
 - **Zero persistence** — no database; all state is in-memory and lost on restart
@@ -20,21 +21,22 @@ Designed to run as a systemd service on a Raspberry Pi 5 (DietPi, `linux/arm64`)
 ## Architecture
 
 ```
-T212 API (1 req/s, HTTPS/TLS 1.3)
+T212 API (HTTPS/TLS 1.3)
     │
     ▼
-poller goroutine
+poller goroutine (1 req/min)
     │  writes all positions
     ▼
 store (sync.RWMutex, in-memory)
-    │  reads + applies £1 filter
+    │  reads all positions
     ▼
 hub.Broadcast()
     ├──► WebSocket → browser (Web UI)
     └──► WebSocket → t212 tui (terminal TUI over SSH)
 
 also on each poll:
-sendNotifications → signal-cli subprocess → Signal message
+├── attachReturns → history store (sold shares, dividends)
+└── sendNotifications → signal-cli subprocess → Signal message
 ```
 
 ### Single binary, two subcommands
@@ -43,16 +45,6 @@ sendNotifications → signal-cli subprocess → Signal message
 |---|---|---|
 | `t212 serve` | Poller + web server + hub + notifier | systemd |
 | `t212 tui` | Terminal subscriber (reads from running serve) | Manual / SSH |
-
----
-
-## Prerequisites
-
-- Go 1.25+ (for building from source)
-- A Trading 212 live account with an API key
-- Raspberry Pi 5 running DietPi (or any `linux/arm64` system)
-- `make`, `ssh`, `scp` on your build machine
-- (Optional) `signal-cli` for notifications — install via `sudo apt install signal-cli` after adding the APT repo
 
 ---
 
@@ -69,12 +61,6 @@ sudo apt install t212
 
 Future updates arrive via `sudo apt update && sudo apt upgrade`.
 
-Or from your build machine:
-
-```bash
-make setup-apt PI_HOST=pi@raspberrypi.local
-```
-
 ### Option B: Manual download
 
 Download the latest `.deb` from the [Releases page](https://github.com/ko5tas/t212/releases/latest):
@@ -86,7 +72,7 @@ sudo dpkg -i t212_<version>_arm64.deb
 
 ### Post-install setup
 
-The installer prints the exact steps to configure and start the service. In summary:
+The `.deb` installer creates the service user, systemd unit, and config directory automatically. Just configure and start:
 
 ```bash
 # 1. Set your API key (and optionally SIGNAL_NUMBER, T212_PORT)
@@ -102,34 +88,9 @@ sudo journalctl -u t212 -f
 
 Open `http://<raspberry-pi-ip>:8080` in a browser on the same LAN.
 
-**Upgrading (APT):** `sudo apt update && sudo apt upgrade` — automatic.
+**Upgrading:** `sudo apt update && sudo apt upgrade` — automatic if using the APT repo.
 
-**Upgrading (manual):** re-download and `sudo dpkg -i t212_<new-version>_arm64.deb`. Your `/etc/t212/config.env` is preserved automatically.
-
-**Removing:** `sudo dpkg -r t212` (config survives). `sudo dpkg --purge t212` (config deleted).
-
----
-
-## Quick start (local development)
-
-```bash
-git clone https://github.com/ko5tas/t212
-cd t212
-
-# Run tests
-make test
-
-# Build for current platform
-make build
-
-# Run the server locally
-T212_API_KEY=<your_key> ./t212 serve
-
-# In another terminal, run the TUI
-./t212 tui
-```
-
-Open `http://localhost:8080` in your browser to see the Web UI.
+**Removing:** `sudo dpkg -r t212` (config preserved). `sudo dpkg --purge t212` (config deleted).
 
 ---
 
@@ -149,45 +110,6 @@ All configuration is via environment variables (or `/etc/t212/config.env` in pro
 | `T212_HOST` | No | `localhost` | Host for `t212 tui` to connect to (TUI subcommand only) |
 
 `T212_API_KEY` and `T212_API_SECRET` are combined as HTTP Basic auth, loaded once at startup, never logged, and never written to disk.
-
----
-
-## Deployment to Raspberry Pi
-
-### 1. Create the service user and config directory
-
-```bash
-ssh pi@raspberrypi.local
-sudo useradd -r -s /usr/sbin/nologin t212
-sudo mkdir -p /etc/t212
-sudo chmod 700 /etc/t212
-```
-
-### 2. Create the config file
-
-```bash
-sudo cp deploy/config.env.example /etc/t212/config.env
-sudo chmod 0600 /etc/t212/config.env
-sudo chown root:root /etc/t212/config.env
-sudo nano /etc/t212/config.env   # fill in T212_API_KEY, SIGNAL_NUMBER, SIGNAL_RECIPIENT
-```
-
-### 3. Deploy
-
-```bash
-# From your build machine:
-make deploy PI_HOST=pi@raspberrypi.local
-```
-
-This cross-compiles for `linux/arm64`, copies the binary and systemd unit to the Pi, and restarts the service.
-
-### 4. Check it's running
-
-```bash
-make logs PI_HOST=pi@raspberrypi.local
-```
-
-Open `http://raspberrypi.local:8080` in a browser on the same LAN.
 
 ---
 
@@ -250,23 +172,50 @@ Alerts are **edge-triggered**: you receive one message when a position crosses t
 
 ---
 
+## Quick start (local development)
+
+```bash
+git clone https://github.com/ko5tas/t212
+cd t212
+
+# Run tests
+make test
+
+# Build for current platform
+make build
+
+# Run the server locally
+T212_API_KEY=<your_key> T212_API_SECRET=<your_secret> ./t212 serve
+
+# In another terminal, run the TUI
+./t212 tui
+```
+
+Open `http://localhost:8080` in your browser to see the Web UI.
+
+### Prerequisites (development only)
+
+- Go 1.25+
+- A Trading 212 live account with an API key
+
+---
+
 ## Makefile targets
 
 | Target | Description |
 |---|---|
 | `make build` | Compile for current platform |
 | `make build-arm` | Cross-compile for Raspberry Pi 5 (`linux/arm64`) |
-| `make deb` | Build `.deb` package for Raspberry Pi (requires `nfpm`: `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.45.0`) |
+| `make deb` | Build `.deb` package (requires [`nfpm`](https://github.com/goreleaser/nfpm)) |
 | `make test` | Run all tests with race detector and coverage |
 | `make lint` | Run `golangci-lint` |
 | `make security` | Run `govulncheck` |
-| `make deploy` | Build + deploy to Pi via SSH/SCP |
-| `make setup-apt` | Add t212 APT repository on Pi for automatic updates |
-| `make setup-signal` | Register Pi as Signal linked device |
-| `make logs` | Tail systemd journal from Pi |
+| `make setup-apt` | Add t212 APT repository on Pi via SSH |
+| `make logs` | Tail systemd journal from Pi via SSH |
+| `make deploy` | Legacy: build + deploy binary to Pi via SSH/SCP |
 | `make clean` | Remove build artifacts |
 
-Override the Pi host: `make deploy PI_HOST=user@192.168.1.10`
+Override the Pi host: `make <target> PI_HOST=user@192.168.1.10`
 
 ---
 
@@ -274,14 +223,15 @@ Override the Pi host: `make deploy PI_HOST=user@192.168.1.10`
 
 | Concern | Decision | Rationale |
 |---|---|---|
-| Filter rule | `currentPrice − averagePrice > £1.00` (strict greater-than) | Simple, predictable, no floating-point ambiguity at the boundary |
 | Polling rate | 1 req/min | Conservative interval to avoid 429s from T212 |
+| Return calculation | `currentValueGBP + totalSold + totalDividends − totalBought` | Exact GBP valuation from T212 API; no manual FX conversion |
+| Blink highlight | `currentValueGBP > totalBought + £1` (strict greater-than) | Simple, predictable, no floating-point ambiguity at the boundary |
 | WebSocket fan-out | Buffered channels (size 8), slow subscribers skipped | Prevents one slow client from blocking the broadcast loop |
 | No database | In-memory store only | Data is live prices; stale data on restart is fine |
 | Signal transport | Second number registered on signal-cli, sends to primary | Real push notifications; no "Note to Self" limitation |
 | TLS | 1.3 minimum for all outbound connections | Enforced via `tls.Config{MinVersion: tls.VersionTLS13}` |
-| Profit field | Computed from `currentPrice − averagePrice` after fetch | T212 API returns raw prices; `ProfitPerShare` and `MarketValue` are derived |
 | Notifications | Edge-detected via `prevAbove` and `prevBelow` maps | Two independent alerts (profit/loss); one message per crossing, not per poll |
+| Packaging | `.deb` via nfpm, APT repo on GitHub Pages | Standard Debian workflow; automatic updates via `apt upgrade` |
 | Local transport | HTTP on LAN | HTTPS/Let's Encrypt deferred to a future iteration |
 
 ---
@@ -301,27 +251,33 @@ Override the Pi host: `make deploy PI_HOST=user@192.168.1.10`
 
 ```
 t212/
-├── cmd/t212/            # main, serve, tui_cmd
+├── cmd/t212/               # main, serve, tui_cmd
 ├── internal/
-│   ├── api/             # T212 HTTP client, Position model, rate-limit parsing
-│   ├── filter/          # profit-per-share threshold filter
-│   ├── store/           # thread-safe in-memory position store
-│   ├── hub/             # WebSocket fan-out hub
-│   ├── poller/          # polling loop, edge-detection, notifier interface
-│   ├── notifier/        # signal-cli subprocess notifier
-│   ├── server/          # HTTP server, WebSocket upgrade, static assets
-│   └── tui/             # bubbletea terminal UI
-├── internal/server/web/ # index.html, style.css, app.js (embedded)
+│   ├── api/                # T212 HTTP client, Position model, rate-limit parsing
+│   ├── filter/             # profit-per-share threshold filter
+│   ├── history/            # order history aggregation (sold shares, dividends)
+│   ├── store/              # thread-safe in-memory position store
+│   ├── hub/                # WebSocket fan-out hub
+│   ├── poller/             # polling loop, edge-detection, notifier interface
+│   ├── notifier/           # signal-cli subprocess notifier
+│   ├── server/             # HTTP server, WebSocket upgrade, static assets
+│   │   └── web/            # index.html, style.css, app.js (embedded)
+│   └── tui/                # bubbletea terminal UI
 ├── deploy/
-│   ├── t212.service       # systemd unit
+│   ├── t212.service          # systemd unit
 │   ├── config.env.example
-│   ├── postinst.sh        # dpkg post-install: create user, enable service, print instructions
-│   ├── prerm.sh           # dpkg pre-remove: stop and disable service
-│   └── postrm.sh          # dpkg post-remove: purge user and config on --purge
+│   ├── postinst.sh           # dpkg post-install: create user, enable service
+│   ├── prerm.sh              # dpkg pre-remove: stop and disable service
+│   ├── postrm.sh             # dpkg post-remove: purge user and config on --purge
+│   ├── signal-cli-nfpm.yaml  # nfpm definition for signal-cli .deb
+│   └── signal-cli-postinst.sh
+├── scripts/
+│   └── setup-apt-repo.sh    # one-line APT repo setup for Pi
 ├── .github/workflows/
-│   ├── ci.yml             # test + build-arm + govulncheck (on push/PR to main)
-│   └── release.yml        # test + build .deb + publish GitHub Release (on semver tags)
-├── nfpm.yaml              # nfpm package definition
+│   ├── ci.yml                # test + build-arm + govulncheck (on push/PR)
+│   ├── release.yml           # build .deb + GitHub Release + APT repo (on tags)
+│   └── signal-cli-update.yml # weekly signal-cli .deb rebuild (cron)
+├── nfpm.yaml                 # nfpm package definition
 ├── Makefile
 └── go.mod
 ```
