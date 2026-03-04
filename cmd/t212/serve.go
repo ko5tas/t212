@@ -32,6 +32,10 @@ func runServe() error {
 	if signalCLIPath == "" {
 		signalCLIPath = "/usr/local/bin/signal-cli"
 	}
+	signalCLIConfig := os.Getenv("SIGNAL_CLI_CONFIG")
+	if signalCLIConfig == "" {
+		signalCLIConfig = "/var/lib/t212/signal-cli"
+	}
 
 	port := os.Getenv("T212_PORT")
 	if port == "" {
@@ -58,7 +62,7 @@ func runServe() error {
 
 	var n poller.Notifier
 	if signalNumber != "" {
-		n = notifier.New(signalCLIPath, signalNumber)
+		n = notifier.New(signalCLIPath, signalNumber, signalCLIConfig)
 	}
 
 	p := poller.New(apiClient, s, h, threshold, n,

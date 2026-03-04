@@ -30,7 +30,7 @@ func fakeSignalCLI(t *testing.T) (binPath, argsFile string) {
 func TestNotifier_NotifyEntered(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
-	n := notifier.New(binPath, "+447700000000")
+	n := notifier.New(binPath, "+447700000000", "")
 	n.Notify("AAPL_US_EQ", true, 9.30, "$")
 
 	data, err := os.ReadFile(argsFile)
@@ -53,7 +53,7 @@ func TestNotifier_NotifyEntered(t *testing.T) {
 func TestNotifier_NotifyExited(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
-	n := notifier.New(binPath, "+447700000000")
+	n := notifier.New(binPath, "+447700000000", "")
 	n.Notify("TSLA_US_EQ", false, 0, "")
 
 	data, _ := os.ReadFile(argsFile)
@@ -64,8 +64,25 @@ func TestNotifier_NotifyExited(t *testing.T) {
 	}
 }
 
+func TestNotifier_ConfigPathPassed(t *testing.T) {
+	binPath, argsFile := fakeSignalCLI(t)
+
+	n := notifier.New(binPath, "+447700000000", "/var/lib/t212/signal-cli")
+	n.Notify("AAPL_US_EQ", true, 5.00, "£")
+
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("read args file: %v", err)
+	}
+	args := string(data)
+
+	if !strings.Contains(args, "--config /var/lib/t212/signal-cli") {
+		t.Errorf("expected --config in args, got: %q", args)
+	}
+}
+
 func TestNotifier_SignalCLINotFound(t *testing.T) {
-	n := notifier.New("/nonexistent/signal-cli", "+447700000000")
+	n := notifier.New("/nonexistent/signal-cli", "+447700000000", "")
 	// Must not panic — just log the error.
 	n.Notify("AAPL_US_EQ", true, 9.30, "$")
 }
