@@ -93,7 +93,11 @@ jobs:
 
           # Generate Release file
           cd dists/stable
-          apt-ftparchive release . > Release
+          apt-ftparchive release \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures=arm64 \
+            . > Release
 
           # Sign Release
           gpg --batch --yes --armor --detach-sign -o Release.gpg Release
