@@ -144,6 +144,7 @@ All configuration is via environment variables (or `/etc/t212/config.env` in pro
 | `T212_PORT` | No | `8080` | Port for the web server |
 | `SIGNAL_NUMBER` | No | — | Your phone number in E.164 format (`+447700…`). Omit to disable Signal notifications. |
 | `SIGNAL_CLI_PATH` | No | `/usr/local/bin/signal-cli` | Path to the `signal-cli` binary |
+| `SIGNAL_CLI_CONFIG` | No | `/var/lib/t212/signal-cli` | signal-cli data directory (passed as `--config`) |
 | `T212_HOST` | No | `localhost` | Host for `t212 tui` to connect to (TUI subcommand only) |
 
 `T212_API_KEY` and `T212_API_SECRET` are combined as HTTP Basic auth, loaded once at startup, never logged, and never written to disk.
