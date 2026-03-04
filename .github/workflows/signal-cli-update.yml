@@ -51,6 +51,10 @@ jobs:
           curl -fsSL -o "${TARBALL}" "${URL}"
           mkdir -p signal-cli-dist
           tar -xzf "${TARBALL}" --strip-components=1 -C signal-cli-dist
+          echo "--- signal-cli-dist contents ---"
+          ls -laR signal-cli-dist/ | head -50
+          echo "--- tarball size ---"
+          ls -la "${TARBALL}"
 
       - name: Install nfpm
         run: |
@@ -66,7 +70,16 @@ jobs:
             --config deploy/signal-cli-nfpm.yaml \
             --packager deb \
             --target .
+          echo "--- .deb file size ---"
           ls -la signal-cli_*.deb
+          echo "--- .deb contents ---"
+          dpkg-deb -c signal-cli_*.deb | head -30
+          # Fail if .deb is suspiciously small (< 1MB)
+          SIZE=$(stat --format=%s signal-cli_*.deb)
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "ERROR: .deb is only ${SIZE} bytes — expected >1MB"
+            exit 1
+          fi
 
       - name: Check out gh-pages
         uses: actions/checkout@v4
