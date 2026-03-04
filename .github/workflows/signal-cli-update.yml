@@ -49,12 +49,14 @@ jobs:
           URL="https://github.com/AsamK/signal-cli/releases/download/${VERSION}/${TARBALL}"
           echo "Downloading ${URL}..."
           curl -fsSL -o "${TARBALL}" "${URL}"
+          echo "--- tarball structure ---"
+          tar -tzf "${TARBALL}" | head -30
+          echo "--- tarball size ---"
+          ls -la "${TARBALL}"
           mkdir -p signal-cli-dist
           tar -xzf "${TARBALL}" --strip-components=1 -C signal-cli-dist
           echo "--- signal-cli-dist contents ---"
           ls -laR signal-cli-dist/ | head -50
-          echo "--- tarball size ---"
-          ls -la "${TARBALL}"
 
       - name: Install nfpm
         run: |
