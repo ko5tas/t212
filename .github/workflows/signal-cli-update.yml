@@ -45,18 +45,14 @@ jobs:
           VERSION: ${{ needs.check.outputs.latest }}
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          TARBALL="signal-cli-${CLEAN_VERSION}-Linux-client.tar.gz"
+          TARBALL="signal-cli-${CLEAN_VERSION}.tar.gz"
           URL="https://github.com/AsamK/signal-cli/releases/download/${VERSION}/${TARBALL}"
           echo "Downloading ${URL}..."
           curl -fsSL -o "${TARBALL}" "${URL}"
-          echo "--- tarball structure ---"
-          tar -tzf "${TARBALL}" | head -30
-          echo "--- tarball size ---"
-          ls -la "${TARBALL}"
           mkdir -p signal-cli-dist
           tar -xzf "${TARBALL}" --strip-components=1 -C signal-cli-dist
-          echo "--- signal-cli-dist contents ---"
-          ls -laR signal-cli-dist/ | head -50
+          echo "Extracted $(find signal-cli-dist -type f | wc -l) files"
+          ls signal-cli-dist/bin/
 
       - name: Install nfpm
         run: |
@@ -72,10 +68,7 @@ jobs:
             --config deploy/signal-cli-nfpm.yaml \
             --packager deb \
             --target .
-          echo "--- .deb file size ---"
           ls -la signal-cli_*.deb
-          echo "--- .deb contents ---"
-          dpkg-deb -c signal-cli_*.deb | head -30
           # Fail if .deb is suspiciously small (< 1MB)
           SIZE=$(stat --format=%s signal-cli_*.deb)
           if [ "$SIZE" -lt 1000000 ]; then
