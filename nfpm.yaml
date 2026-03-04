@@ -31,3 +31,6 @@ scripts:
   postinstall: ./deploy/postinst.sh
   preremove:   ./deploy/prerm.sh
   postremove:  ./deploy/postrm.sh
+
+recommends:
+  - signal-cli
