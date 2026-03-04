@@ -7,7 +7,7 @@ PI_CFG_DIR  := /etc/t212
 
 VERSION     ?= $(shell v=$$(git describe --tags --abbrev=0 2>/dev/null) && echo "$$v" | sed 's/^v//' || echo "0.0.0-dev")
 
-.PHONY: build build-arm test lint security deb deploy setup-apt setup-signal update-signal-cli logs clean
+.PHONY: build build-arm test lint security deb deploy setup-apt setup-signal logs clean
 
 ## build: compile for current platform
 build:
@@ -53,10 +53,6 @@ setup-apt:
 ## setup-signal: register Pi as Signal linked device (scan QR with Signal app)
 setup-signal:
 	ssh $(PI_HOST) "signal-cli link -n 'T212-Pi' | qrencode -t ansiutf8"
-
-## update-signal-cli: download and SHA256-verify latest signal-cli release on Pi
-update-signal-cli:
-	@./scripts/update-signal-cli.sh $(PI_HOST)
 
 ## logs: tail service logs from Pi
 logs:

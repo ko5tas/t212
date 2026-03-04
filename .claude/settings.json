@@ -8,7 +8,8 @@
       "WebFetch(domain:t212public-api-docs.redoc.ly)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:community.trading212.com)",
-      "WebFetch(domain:live.trading212.com)"
+      "WebFetch(domain:live.trading212.com)",
+      "Read(//Users/kostas/.claude/plugins/cache/claude-plugins-official/superpowers/4.3.1/skills/subagent-driven-development/**)"
     ],
     "additionalDirectories": [
       "/Users/kostas/.claude/projects/-Users-kostas-Dropbox-Mac--5--Documents-dev-github-com-ko5tas-t212"
