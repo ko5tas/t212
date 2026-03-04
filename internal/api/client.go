@@ -156,6 +156,18 @@ func inferCurrency(ticker string) string {
 	return "GBX"
 }
 
+// shortExchangeName abbreviates well-known exchange names for display.
+var exchangeAbbreviations = map[string]string{
+	"London Stock Exchange": "LSE",
+}
+
+func shortExchangeName(name string) string {
+	if short, ok := exchangeAbbreviations[name]; ok {
+		return short
+	}
+	return name
+}
+
 func parseRateLimit(resp *http.Response) RateLimitInfo {
 	remaining, _ := strconv.Atoi(resp.Header.Get("x-ratelimit-remaining"))
 	resetUnix, _ := strconv.ParseInt(resp.Header.Get("x-ratelimit-reset"), 10, 64)
@@ -251,7 +263,7 @@ func (c *Client) LoadMetadata(ctx context.Context) error {
 	}
 	c.exchanges = make(map[int]string, len(exchanges))
 	for _, ex := range exchanges {
-		c.exchanges[ex.ID] = ex.Name
+		c.exchanges[ex.ID] = shortExchangeName(ex.Name)
 	}
 
 	slog.Info("loaded instrument metadata", "instruments", len(c.instruments), "exchanges", len(c.exchanges))
