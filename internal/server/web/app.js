@@ -59,7 +59,6 @@
       case 'name': return p.name || '';
       case 'return': return p.returns ? p.returns['return'] : 0;
       case 'returnPct': return p.returns ? p.returns.returnPct : 0;
-      case 'netRoi': return p.returns ? p.returns.netRoiPct : 0;
       case 'quantity': return p.quantity || 0;
       case 'currentPrice': return p.currentPrice || 0;
       case 'averagePrice': return p.averagePrice || 0;
@@ -194,17 +193,13 @@
         var r = p.returns;
         var retVal = '--';
         var retPct = '--';
-        var netRoi = '--';
         var retCls = '';
         var pctCls = '';
-        var roiCls = '';
         if (r) {
           retCls = retClass(r['return'], r.returnPct);
           pctCls = retCls;
-          roiCls = retClass(r.netRoiPct, r.netRoiPct);
           retVal = fmt(r['return'], 'GBP');
           retPct = r.returnPct.toFixed(1) + '%';
-          netRoi = r.netRoiPct.toFixed(1) + '%';
           totalReturn += r['return'];
           totalBought += r.totalBought || 0;
         }
@@ -223,7 +218,6 @@
           '<td><button class="btn-refresh-row" title="Refresh ' + p.ticker + '">&#x21bb;</button></td>' +
           '<td class="' + retCls + '">' + retVal + '</td>' +
           '<td class="' + pctCls + '">' + retPct + '</td>' +
-          '<td class="' + roiCls + '">' + netRoi + '</td>' +
           '<td>' + p.quantity + '</td>' +
           '<td>' + fmt(p.currentPrice, c) + '</td>' +
           '<td>' + fmt(p.averagePrice, c) + '</td>' +
@@ -247,7 +241,7 @@
         '<td></td>' +
         '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
         '<td class="' + totCls + '"><strong>' + totalRetPct.toFixed(1) + '%</strong></td>' +
-        '<td></td><td></td><td></td><td></td><td></td>';
+        '<td></td><td></td><td></td><td></td>';
       tfootEl.appendChild(tfoot);
     }
   }

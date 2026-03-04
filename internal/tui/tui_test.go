@@ -94,7 +94,7 @@ func TestModel_TimestampUpdated(t *testing.T) {
 
 func TestModel_ViewShowsReturnColumns(t *testing.T) {
 	m := tui.NewModel()
-	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.08}
+	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30}
 	payload := tui.WSMessage{
 		Timestamp: time.Now(),
 		Positions: []api.Position{
@@ -116,8 +116,8 @@ func TestModel_ViewShowsReturnColumns(t *testing.T) {
 	if !strings.Contains(view, "42.30") {
 		t.Error("view should contain return value 42.30")
 	}
-	if !strings.Contains(view, "65.08") {
-		t.Error("view should contain NetROI value 65.08")
+	if !strings.Contains(view, "42.30") {
+		t.Error("view should contain return percentage 42.30")
 	}
 }
 

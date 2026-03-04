@@ -14,7 +14,6 @@ func TestReturnInfo_JSON(t *testing.T) {
 		TotalDividends: 7.30,
 		Return:         42.30,
 		ReturnPct:      42.30,
-		NetROIPct:      65.08,
 	}
 	b, err := json.Marshal(ri)
 	if err != nil {

@@ -315,7 +315,7 @@ func TestPoller_BroadcastIncludesReturns(t *testing.T) {
 	defer unsub()
 
 	hs := history.NewStore()
-	hs.Set("AAPL_US_EQ", api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.0})
+	hs.Set("AAPL_US_EQ", api.ReturnInfo{Return: 42.30, ReturnPct: 42.30})
 
 	p := poller.NewForTesting(
 		api.NewClient("k", "s", srv.URL, srv.Client()),

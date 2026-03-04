@@ -53,6 +53,5 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 		TotalDividends: dividends,
 		Return:         ret,
 		ReturnPct:      retPct,
-		NetROIPct:      retPct,
 	}
 }

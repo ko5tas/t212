@@ -9,7 +9,6 @@ type ReturnInfo struct {
 	TotalDividends float64 `json:"totalDividends"`
 	Return         float64 `json:"return"`
 	ReturnPct      float64 `json:"returnPct"`
-	NetROIPct      float64 `json:"netRoiPct"`
 }
 
 // HistoricalOrder is one item from GET /api/v0/equity/history/orders.

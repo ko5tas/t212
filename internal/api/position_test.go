@@ -63,7 +63,7 @@ func TestPosition_ReturnsNilByDefault(t *testing.T) {
 }
 
 func TestPosition_ReturnsInJSON(t *testing.T) {
-	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30, NetROIPct: 65.08}
+	ri := &api.ReturnInfo{Return: 42.30, ReturnPct: 42.30}
 	p := api.Position{Ticker: "AAPL_US_EQ", Returns: ri}
 	b, _ := json.Marshal(p)
 	var got api.Position

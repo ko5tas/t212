@@ -42,7 +42,6 @@ const (
 	SortName
 	SortReturn
 	SortReturnPct
-	SortNetROI
 	SortQuantity
 	SortCurrentPrice
 	SortAvgPrice
@@ -63,8 +62,6 @@ func (s SortColumn) String() string {
 		return "RETURN"
 	case SortReturnPct:
 		return "RETURN %"
-	case SortNetROI:
-		return "NET ROI %"
 	case SortQuantity:
 		return "QTY"
 	case SortCurrentPrice:
@@ -244,13 +241,6 @@ func returnPctVal(p api.Position) float64 {
 	return p.Returns.ReturnPct
 }
 
-func netROIVal(p api.Position) float64 {
-	if p.Returns == nil {
-		return 0
-	}
-	return p.Returns.NetROIPct
-}
-
 func posLess(a, b api.Position, col SortColumn) bool {
 	switch col {
 	case SortTicker:
@@ -261,8 +251,6 @@ func posLess(a, b api.Position, col SortColumn) bool {
 		return returnVal(a) < returnVal(b)
 	case SortReturnPct:
 		return returnPctVal(a) < returnPctVal(b)
-	case SortNetROI:
-		return netROIVal(a) < netROIVal(b)
 	case SortQuantity:
 		return a.Quantity < b.Quantity
 	case SortCurrentPrice:
@@ -394,7 +382,6 @@ func (m Model) View() string {
 			m.renderHeader("EXCHANGE", SortExchange, 16) + " " +
 			m.renderHeader("RETURN", SortReturn, 10) + " " +
 			m.renderHeader("RETURN %", SortReturnPct, 10) + " " +
-			m.renderHeader("NET ROI %", SortNetROI, 10) + " " +
 			m.renderHeader("QTY", SortQuantity, 10) + " " +
 			m.renderHeader("CURR PRICE", SortCurrentPrice, 13) + " " +
 			m.renderHeader("AVG PRICE", SortAvgPrice, 12) + " " +
@@ -406,11 +393,10 @@ func (m Model) View() string {
 			if i == m.cursor {
 				marker = ">"
 			}
-			retStr := fmt.Sprintf("%10s %10s %10s", "--", "--", "--")
+			retStr := fmt.Sprintf("%10s %10s", "--", "--")
 			if p.Returns != nil {
 				retVal := fmt.Sprintf("%10.2f", p.Returns.Return)
 				retPct := fmt.Sprintf("%9.2f%%", p.Returns.ReturnPct)
-				roiPct := fmt.Sprintf("%9.2f%%", p.Returns.NetROIPct)
 				if p.Returns.ReturnPct > 50 {
 					retVal = profitStyle.Render(retVal)
 					retPct = profitStyle.Render(retPct)
@@ -418,12 +404,7 @@ func (m Model) View() string {
 					retVal = lossStyle.Render(retVal)
 					retPct = lossStyle.Render(retPct)
 				}
-				if p.Returns.NetROIPct > 50 {
-					roiPct = profitStyle.Render(roiPct)
-				} else if p.Returns.NetROIPct < 0 {
-					roiPct = lossStyle.Render(roiPct)
-				}
-				retStr = fmt.Sprintf("%s %s %s", retVal, retPct, roiPct)
+				retStr = fmt.Sprintf("%s %s", retVal, retPct)
 				totalReturn += p.Returns.Return
 				totalBought += p.Returns.TotalBought
 			}
@@ -476,14 +457,14 @@ func (m Model) View() string {
 			totalPctStr = lossStyle.Render(totalPctStr)
 		}
 		totalValGBPStr := fmt.Sprintf("%-20s", fmt.Sprintf("£%.2f", totalValueGBP))
-		totalsLine := fmt.Sprintf("     %-16s %-24s %s %-16s %s %s %10s %10s %13s %12s %14s",
+		totalsLine := fmt.Sprintf("     %-16s %-24s %s %-16s %s %s %10s %13s %12s %14s",
 			"TOTAL",
 			"",
 			totalValGBPStr,
 			"",
 			totalRetStr,
 			totalPctStr,
-			"", "", "", "", "",
+			"", "", "", "",
 		)
 		out += totalStyle.Render(totalsLine) + "\n"
 	}
