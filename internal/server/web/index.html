@@ -15,6 +15,11 @@
     <span id="updated"></span>
   </header>
   <main>
+    <div class="tabs">
+      <button class="tab active" data-tab="active">Active Positions</button>
+      <button class="tab" data-tab="closed">Closed Positions</button>
+    </div>
+    <div id="tab-active">
     <p id="empty" class="empty hidden">No positions</p>
     <table id="positions" class="hidden">
       <thead>
@@ -37,6 +42,24 @@
       <tbody id="tbody"></tbody>
       <tfoot id="tfoot"></tfoot>
     </table>
+    </div>
+    <div id="tab-closed" class="hidden">
+    <p id="closed-empty" class="empty">No closed positions</p>
+    <table id="closed-positions" class="hidden">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th data-col-closed="ticker">Ticker</th>
+          <th data-col-closed="name">Name</th>
+          <th data-col-closed="exchange">Exchange</th>
+          <th data-col-closed="return">Return</th>
+          <th data-col-closed="returnPct">Return %</th>
+        </tr>
+      </thead>
+      <tbody id="closed-tbody"></tbody>
+      <tfoot id="closed-tfoot"></tfoot>
+    </table>
+    </div>
   </main>
   <script src="/app.js"></script>
 </body>

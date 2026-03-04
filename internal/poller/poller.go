@@ -17,8 +17,9 @@ const pollInterval = time.Minute
 
 // BroadcastMessage is the JSON payload sent to WebSocket subscribers on each poll.
 type BroadcastMessage struct {
-	Timestamp time.Time      `json:"timestamp"`
-	Positions []api.Position `json:"positions"`
+	Timestamp       time.Time            `json:"timestamp"`
+	Positions       []api.Position       `json:"positions"`
+	ClosedPositions []api.ClosedPosition `json:"closedPositions"`
 }
 
 // Poller polls the T212 API, updates the store, and broadcasts filtered positions.
@@ -123,13 +124,40 @@ func (p *Poller) poll(ctx context.Context) {
 	filtered := filter.Apply(positions, p.threshold)
 	p.sendNotifications(filtered)
 	p.attachReturns(positions)
-	p.broadcast(positions)
+	closed := p.buildClosedPositions(positions)
+	p.broadcast(positions, closed)
 }
 
-func (p *Poller) broadcast(filtered []api.Position) {
+func (p *Poller) buildClosedPositions(openPositions []api.Position) []api.ClosedPosition {
+	if p.historyStore == nil {
+		return nil
+	}
+	open := make(map[string]bool, len(openPositions))
+	for _, pos := range openPositions {
+		open[pos.Ticker] = true
+	}
+	var closed []api.ClosedPosition
+	for _, ticker := range p.historyStore.Tickers() {
+		if open[ticker] {
+			continue
+		}
+		ri := p.historyStore.Get(ticker)
+		name, exchange := p.client.LookupInstrument(ticker)
+		closed = append(closed, api.ClosedPosition{
+			Ticker:   ticker,
+			Name:     name,
+			Exchange: exchange,
+			Returns:  ri,
+		})
+	}
+	return closed
+}
+
+func (p *Poller) broadcast(filtered []api.Position, closed []api.ClosedPosition) {
 	msg := BroadcastMessage{
-		Timestamp: time.Now().UTC(),
-		Positions: filtered,
+		Timestamp:       time.Now().UTC(),
+		Positions:       filtered,
+		ClosedPositions: closed,
 	}
 	b, err := json.Marshal(msg)
 	if err != nil {

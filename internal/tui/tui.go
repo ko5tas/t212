@@ -17,9 +17,22 @@ import (
 
 // WSMessage matches the BroadcastMessage sent by the poller.
 type WSMessage struct {
-	Timestamp time.Time      `json:"timestamp"`
-	Positions []api.Position `json:"positions"`
+	Timestamp       time.Time            `json:"timestamp"`
+	Positions       []api.Position       `json:"positions"`
+	ClosedPositions []api.ClosedPosition `json:"closedPositions"`
 }
+
+// ClosedSortColumn identifies which column the closed positions table is sorted by.
+type ClosedSortColumn int
+
+const (
+	ClosedSortTicker ClosedSortColumn = iota
+	ClosedSortName
+	ClosedSortExchange
+	ClosedSortReturn
+	ClosedSortReturnPct
+	closedSortColumnCount
+)
 
 // SortColumn identifies which column the table is sorted by.
 type SortColumn int
@@ -71,18 +84,27 @@ func (s SortColumn) String() string {
 // Model is the bubbletea model. All state transitions happen via ApplyMessage
 // so they are testable without bubbletea I/O.
 type Model struct {
-	positions []api.Position
-	updated   time.Time
-	err       error
-	conn      *websocket.Conn
-	cursor    int
-	sortCol   SortColumn
-	sortAsc   bool
+	positions       []api.Position
+	closedPositions []api.ClosedPosition
+	showClosed      bool
+	updated         time.Time
+	err             error
+	conn            *websocket.Conn
+	cursor          int
+	sortCol         SortColumn
+	sortAsc         bool
+	closedSortCol   ClosedSortColumn
+	closedSortAsc   bool
 }
 
 // NewModel returns an empty Model.
 func NewModel() Model {
-	return Model{positions: []api.Position{}, sortCol: SortMarketValue}
+	return Model{
+		positions:       []api.Position{},
+		closedPositions: []api.ClosedPosition{},
+		sortCol:         SortMarketValue,
+		closedSortCol:   ClosedSortReturn,
+	}
 }
 
 // Positions returns the current positions.
@@ -100,6 +122,12 @@ func (m Model) SortCol() SortColumn { return m.sortCol }
 // SortAsc returns whether sorting is ascending.
 func (m Model) SortAsc() bool { return m.sortAsc }
 
+// ShowClosed returns whether the closed positions tab is active.
+func (m Model) ShowClosed() bool { return m.showClosed }
+
+// ClosedPositions returns the current closed positions.
+func (m Model) ClosedPositions() []api.ClosedPosition { return m.closedPositions }
+
 // ApplyMessage parses a raw WebSocket JSON message and returns an updated Model.
 // Invalid JSON is silently ignored (model unchanged).
 func (m Model) ApplyMessage(raw []byte) Model {
@@ -110,9 +138,14 @@ func (m Model) ApplyMessage(raw []byte) Model {
 	if msg.Positions == nil {
 		msg.Positions = []api.Position{}
 	}
+	if msg.ClosedPositions == nil {
+		msg.ClosedPositions = []api.ClosedPosition{}
+	}
 	m.positions = msg.Positions
+	m.closedPositions = msg.ClosedPositions
 	m.updated = msg.Timestamp
 	m.sortPositions()
+	m.sortClosedPositions()
 	return m
 }
 
@@ -131,8 +164,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch v.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "tab":
+			m.showClosed = !m.showClosed
+			m.cursor = 0
 		case "r":
-			if m.conn != nil && len(m.positions) > 0 && m.cursor < len(m.positions) {
+			if !m.showClosed && m.conn != nil && len(m.positions) > 0 && m.cursor < len(m.positions) {
 				ticker := m.positions[m.cursor].Ticker
 				m.conn.WriteMessage(websocket.TextMessage,
 					[]byte(`{"action":"refresh","ticker":"`+ticker+`"}`))
@@ -143,7 +179,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					[]byte(`{"action":"refresh_all"}`))
 			}
 		case "j", "down":
-			if m.cursor < len(m.positions)-1 {
+			maxIdx := len(m.positions) - 1
+			if m.showClosed {
+				maxIdx = len(m.closedPositions) - 1
+			}
+			if m.cursor < maxIdx {
 				m.cursor++
 			}
 		case "k", "up":
@@ -151,12 +191,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "s":
-			m.sortCol = (m.sortCol + 1) % sortColumnCount
-			m.sortAsc = false
-			m.sortPositions()
+			if m.showClosed {
+				m.closedSortCol = (m.closedSortCol + 1) % closedSortColumnCount
+				m.closedSortAsc = false
+				m.sortClosedPositions()
+			} else {
+				m.sortCol = (m.sortCol + 1) % sortColumnCount
+				m.sortAsc = false
+				m.sortPositions()
+			}
 		case "S":
-			m.sortAsc = !m.sortAsc
-			m.sortPositions()
+			if m.showClosed {
+				m.closedSortAsc = !m.closedSortAsc
+				m.sortClosedPositions()
+			} else {
+				m.sortAsc = !m.sortAsc
+				m.sortPositions()
+			}
 		}
 	case msgReceived:
 		m = m.ApplyMessage(v)
@@ -228,6 +279,48 @@ func posLess(a, b api.Position, col SortColumn) bool {
 	return false
 }
 
+func (m *Model) sortClosedPositions() {
+	col := m.closedSortCol
+	asc := m.closedSortAsc
+	sort.SliceStable(m.closedPositions, func(i, j int) bool {
+		less := closedPosLess(m.closedPositions[i], m.closedPositions[j], col)
+		if asc {
+			return less
+		}
+		return !less
+	})
+}
+
+func closedReturnVal(p api.ClosedPosition) float64 {
+	if p.Returns == nil {
+		return 0
+	}
+	return p.Returns.Return
+}
+
+func closedReturnPctVal(p api.ClosedPosition) float64 {
+	if p.Returns == nil {
+		return 0
+	}
+	return p.Returns.ReturnPct
+}
+
+func closedPosLess(a, b api.ClosedPosition, col ClosedSortColumn) bool {
+	switch col {
+	case ClosedSortTicker:
+		return a.Ticker < b.Ticker
+	case ClosedSortName:
+		return a.Name < b.Name
+	case ClosedSortExchange:
+		return a.Exchange < b.Exchange
+	case ClosedSortReturn:
+		return closedReturnVal(a) < closedReturnVal(b)
+	case ClosedSortReturnPct:
+		return closedReturnPctVal(a) < closedReturnPctVal(b)
+	}
+	return false
+}
+
 var (
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
 	profitStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ade80")).Bold(true)
@@ -254,6 +347,19 @@ func (m Model) renderHeader(name string, col SortColumn, width int) string {
 	return headerStyle.Render(padded)
 }
 
+func (m Model) renderClosedHeader(name string, col ClosedSortColumn, width int) string {
+	indicator := ""
+	if m.closedSortCol == col {
+		if m.closedSortAsc {
+			indicator = " ▲"
+		} else {
+			indicator = " ▼"
+		}
+	}
+	padded := fmt.Sprintf("%-*s", width, name+indicator)
+	return headerStyle.Render(padded)
+}
+
 // View renders the TUI.
 func (m Model) View() string {
 	if m.err != nil {
@@ -261,7 +367,22 @@ func (m Model) View() string {
 	}
 
 	out := titleStyle.Render("T212 Dashboard") + "\n"
-	out += dimStyle.Render("[r: refresh stock | R: refresh all | j/k: navigate | s/S: sort | q: quit]") + "\n\n"
+	out += dimStyle.Render("[Tab: switch view | r: refresh stock | R: refresh all | j/k: navigate | s/S: sort | q: quit]") + "\n"
+
+	activeLabel := "Active"
+	closedLabel := "Closed"
+	if m.showClosed {
+		activeLabel = dimStyle.Render("Active")
+		closedLabel = titleStyle.Render("[Closed]")
+	} else {
+		activeLabel = titleStyle.Render("[Active]")
+		closedLabel = dimStyle.Render("Closed")
+	}
+	out += activeLabel + "  " + closedLabel + "\n\n"
+
+	if m.showClosed {
+		return out + m.viewClosed()
+	}
 
 	if len(m.positions) == 0 {
 		out += dimStyle.Render("No positions") + "\n"
@@ -363,6 +484,80 @@ func (m Model) View() string {
 			totalRetStr,
 			totalPctStr,
 			"", "", "", "", "",
+		)
+		out += totalStyle.Render(totalsLine) + "\n"
+	}
+
+	if !m.updated.IsZero() {
+		out += "\n" + dimStyle.Render("Last updated: "+m.updated.Local().Format("15:04:05"))
+	}
+	return out
+}
+
+func (m Model) viewClosed() string {
+	out := ""
+	if len(m.closedPositions) == 0 {
+		out += dimStyle.Render("No closed positions") + "\n"
+	} else {
+		out += "     " +
+			m.renderClosedHeader("TICKER", ClosedSortTicker, 16) + " " +
+			m.renderClosedHeader("NAME", ClosedSortName, 30) + " " +
+			m.renderClosedHeader("EXCHANGE", ClosedSortExchange, 20) + " " +
+			m.renderClosedHeader("RETURN", ClosedSortReturn, 12) + " " +
+			m.renderClosedHeader("RETURN %", ClosedSortReturnPct, 10) + "\n"
+		var totalReturn, totalBought float64
+		for i, p := range m.closedPositions {
+			marker := " "
+			if i == m.cursor {
+				marker = ">"
+			}
+			retVal := fmt.Sprintf("%12s", "--")
+			retPct := fmt.Sprintf("%10s", "--")
+			if p.Returns != nil {
+				rv := fmt.Sprintf("%12.2f", p.Returns.Return)
+				rp := fmt.Sprintf("%9.2f%%", p.Returns.ReturnPct)
+				if p.Returns.ReturnPct > 50 {
+					rv = profitStyle.Render(rv)
+					rp = profitStyle.Render(rp)
+				} else if p.Returns.Return < 0 {
+					rv = lossStyle.Render(rv)
+					rp = lossStyle.Render(rp)
+				}
+				retVal = rv
+				retPct = rp
+				totalReturn += p.Returns.Return
+				totalBought += p.Returns.TotalBought
+			}
+			name := p.Name
+			if len(name) > 28 {
+				name = name[:28]
+			}
+			out += fmt.Sprintf("%s%3d %-16s %-30s %-20s %s %s\n",
+				marker,
+				i+1,
+				p.Ticker,
+				name,
+				p.Exchange,
+				retVal,
+				retPct,
+			)
+		}
+		// Totals row
+		var totalRetPct float64
+		if totalBought > 0 {
+			totalRetPct = totalReturn / totalBought * 100
+		}
+		totalRetStr := fmt.Sprintf("%12.2f", totalReturn)
+		totalPctStr := fmt.Sprintf("%9.2f%%", totalRetPct)
+		if totalRetPct > 50 {
+			totalRetStr = profitStyle.Render(totalRetStr)
+			totalPctStr = profitStyle.Render(totalPctStr)
+		} else if totalReturn < 0 {
+			totalRetStr = lossStyle.Render(totalRetStr)
+			totalPctStr = lossStyle.Render(totalPctStr)
+		}
+		totalsLine := fmt.Sprintf("     %-16s %-30s %-20s %s %s",
+			"TOTAL", "", "", totalRetStr, totalPctStr,
 		)
 		out += totalStyle.Render(totalsLine) + "\n"
 	}

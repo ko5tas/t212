@@ -4,6 +4,7 @@ package api
 // /api/v0/equity/metadata/instruments endpoint.
 type InstrumentMeta struct {
 	Ticker            string `json:"ticker"`
+	Name              string `json:"name"`
 	CurrencyCode      string `json:"currencyCode"`
 	WorkingScheduleID int    `json:"workingScheduleId"`
 }

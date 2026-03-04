@@ -301,6 +301,118 @@ func TestModel_SortIndicatorInView(t *testing.T) {
 	}
 }
 
+func TestModel_TabToggle(t *testing.T) {
+	m := tui.NewModel()
+	if m.ShowClosed() {
+		t.Error("default should show active positions")
+	}
+
+	// Press Tab to switch to closed
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model := m2.(tui.Model)
+	if !model.ShowClosed() {
+		t.Error("should show closed after Tab")
+	}
+
+	// Press Tab again to switch back
+	m3, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model2 := m3.(tui.Model)
+	if model2.ShowClosed() {
+		t.Error("should show active after second Tab")
+	}
+}
+
+func TestModel_ClosedPositionsFromMessage(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{
+			{Ticker: "AAPL_US_EQ", ProfitPerShare: 5},
+		},
+		ClosedPositions: []api.ClosedPosition{
+			{Ticker: "TSLA_US_EQ", Name: "Tesla", Exchange: "NYSE", Returns: &api.ReturnInfo{Return: 50.0, ReturnPct: 25.0}},
+			{Ticker: "OLD_EQ", Name: "Old Corp", Exchange: "LSE", Returns: &api.ReturnInfo{Return: -10.0, ReturnPct: -5.0}},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	if len(m.ClosedPositions()) != 2 {
+		t.Fatalf("expected 2 closed positions, got %d", len(m.ClosedPositions()))
+	}
+	if len(m.Positions()) != 1 {
+		t.Fatalf("expected 1 active position, got %d", len(m.Positions()))
+	}
+}
+
+func TestModel_ClosedViewRenders(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp: time.Now(),
+		Positions: []api.Position{},
+		ClosedPositions: []api.ClosedPosition{
+			{Ticker: "TSLA_US_EQ", Name: "Tesla", Exchange: "NYSE", Returns: &api.ReturnInfo{Return: 50.0, ReturnPct: 25.0, TotalBought: 200.0}},
+		},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	// Switch to closed view
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model := m2.(tui.Model)
+	view := model.View()
+
+	if !strings.Contains(view, "Closed") {
+		t.Error("closed view should show Closed tab label")
+	}
+	if !strings.Contains(view, "TSLA_US_EQ") {
+		t.Error("closed view should contain the closed ticker")
+	}
+	if !strings.Contains(view, "Tesla") {
+		t.Error("closed view should contain the instrument name")
+	}
+	if !strings.Contains(view, "NYSE") {
+		t.Error("closed view should contain the exchange")
+	}
+	if !strings.Contains(view, "50.00") {
+		t.Error("closed view should contain the return value")
+	}
+	if !strings.Contains(view, "25.00") {
+		t.Error("closed view should contain the return percentage")
+	}
+	if !strings.Contains(view, "TOTAL") {
+		t.Error("closed view should contain a TOTAL row")
+	}
+}
+
+func TestModel_ClosedViewEmpty(t *testing.T) {
+	m := tui.NewModel()
+	payload := tui.WSMessage{
+		Timestamp:       time.Now(),
+		Positions:       []api.Position{},
+		ClosedPositions: []api.ClosedPosition{},
+	}
+	b, _ := json.Marshal(payload)
+	m = m.ApplyMessage(b)
+
+	// Switch to closed view
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model := m2.(tui.Model)
+	view := model.View()
+
+	if !strings.Contains(view, "No closed positions") {
+		t.Error("empty closed view should show 'No closed positions'")
+	}
+}
+
+func TestModel_NullClosedPositionsInJSON(t *testing.T) {
+	m := tui.NewModel()
+	updated := m.ApplyMessage([]byte(`{"timestamp":"2026-03-04T00:00:00Z","positions":[],"closedPositions":null}`))
+	if updated.ClosedPositions() == nil {
+		t.Error("closedPositions should be empty slice, not nil when JSON has null")
+	}
+}
+
 func TestModel_ViewRowNumbersAndTotals(t *testing.T) {
 	m := tui.NewModel()
 	payload := tui.WSMessage{

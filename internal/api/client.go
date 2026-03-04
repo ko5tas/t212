@@ -270,6 +270,19 @@ func (c *Client) LoadMetadata(ctx context.Context) error {
 	return nil
 }
 
+// LookupInstrument returns the name and exchange for a ticker from cached metadata.
+func (c *Client) LookupInstrument(ticker string) (name, exchange string) {
+	meta, ok := c.instruments[ticker]
+	if !ok {
+		return "", ""
+	}
+	name = meta.Name
+	if exName, ok := c.exchanges[meta.WorkingScheduleID]; ok {
+		exchange = exName
+	}
+	return name, exchange
+}
+
 // FetchOrderHistory fetches all order fills, paginating automatically.
 // Pass "" for ticker to fetch all stocks.
 func (c *Client) FetchOrderHistory(ctx context.Context, ticker string) ([]HistoricalOrder, error) {

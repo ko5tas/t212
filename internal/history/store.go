@@ -41,3 +41,14 @@ func (s *Store) SetAll(m map[string]api.ReturnInfo) {
 	defer s.mu.Unlock()
 	s.data = m
 }
+
+// Tickers returns all tickers that have return data.
+func (s *Store) Tickers() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tickers := make([]string, 0, len(s.data))
+	for t := range s.data {
+		tickers = append(tickers, t)
+	}
+	return tickers
+}

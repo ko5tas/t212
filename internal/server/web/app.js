@@ -13,8 +13,12 @@
 
   var ws = null;
   var lastPositions = [];
+  var lastClosed = [];
   var sortCol = 'marketValue';
   var sortAsc = false;
+  var closedSortCol = 'return';
+  var closedSortAsc = false;
+  var activeTab = 'active';
 
   function sendRefresh(ticker) {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -30,6 +34,25 @@
 
   document.getElementById('refresh-all').addEventListener('click', sendRefreshAll);
 
+  // --- Tab switching ---
+  document.querySelectorAll('.tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tab = btn.getAttribute('data-tab');
+      if (tab === activeTab) return;
+      activeTab = tab;
+      document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      if (tab === 'active') {
+        document.getElementById('tab-active').classList.remove('hidden');
+        document.getElementById('tab-closed').classList.add('hidden');
+      } else {
+        document.getElementById('tab-active').classList.add('hidden');
+        document.getElementById('tab-closed').classList.remove('hidden');
+      }
+    });
+  });
+
+  // --- Active positions sorting ---
   function colValue(p, col) {
     switch (col) {
       case 'ticker': return p.ticker || '';
@@ -87,6 +110,61 @@
       }
       updateSortIndicators();
       renderPositions(lastPositions);
+    });
+  });
+
+  // --- Closed positions sorting ---
+  function closedColValue(p, col) {
+    switch (col) {
+      case 'ticker': return p.ticker || '';
+      case 'name': return p.name || '';
+      case 'exchange': return p.exchange || '';
+      case 'return': return p.returns ? p.returns['return'] : 0;
+      case 'returnPct': return p.returns ? p.returns.returnPct : 0;
+      default: return 0;
+    }
+  }
+
+  function sortClosed(positions) {
+    var sorted = positions.slice();
+    sorted.sort(function (a, b) {
+      var va = closedColValue(a, closedSortCol);
+      var vb = closedColValue(b, closedSortCol);
+      var cmp;
+      if (typeof va === 'string') {
+        cmp = va.localeCompare(vb);
+      } else {
+        cmp = va - vb;
+      }
+      return closedSortAsc ? cmp : -cmp;
+    });
+    return sorted;
+  }
+
+  function updateClosedSortIndicators() {
+    var ths = document.querySelectorAll('th[data-col-closed]');
+    ths.forEach(function (th) {
+      var base = th.textContent.replace(/ [▲▼]$/, '');
+      if (th.getAttribute('data-col-closed') === closedSortCol) {
+        th.textContent = base + (closedSortAsc ? ' ▲' : ' ▼');
+      } else {
+        th.textContent = base;
+      }
+    });
+  }
+
+  document.querySelectorAll('th[data-col-closed]').forEach(function (th) {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', function () {
+      var col = th.getAttribute('data-col-closed');
+      if (closedSortCol === col) {
+        closedSortAsc = !closedSortAsc;
+      } else {
+        closedSortCol = col;
+        closedSortAsc = false;
+      }
+      updateClosedSortIndicators();
+      renderClosed(lastClosed);
     });
   });
 
@@ -174,9 +252,67 @@
     }
   }
 
+  function renderClosed(positions) {
+    var closedTbody = document.getElementById('closed-tbody');
+    var closedTfoot = document.getElementById('closed-tfoot');
+    var closedTable = document.getElementById('closed-positions');
+    var closedEmpty = document.getElementById('closed-empty');
+    closedTbody.innerHTML = '';
+    closedTfoot.innerHTML = '';
+
+    var sorted = sortClosed(positions);
+    if (sorted.length === 0) {
+      closedTable.classList.add('hidden');
+      closedEmpty.classList.remove('hidden');
+    } else {
+      closedEmpty.classList.add('hidden');
+      closedTable.classList.remove('hidden');
+      var totalReturn = 0;
+      var totalBought = 0;
+      sorted.forEach(function (p, idx) {
+        var r = p.returns;
+        var retVal = '--';
+        var retPct = '--';
+        var retCls = '';
+        var pctCls = '';
+        if (r) {
+          retCls = retClass(r['return'], r.returnPct);
+          pctCls = retCls;
+          retVal = fmt(r['return'], 'GBP');
+          retPct = r.returnPct.toFixed(1) + '%';
+          totalReturn += r['return'];
+          totalBought += r.totalBought || 0;
+        }
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + (idx + 1) + '</td>' +
+          '<td>' + (p.ticker || '') + '</td>' +
+          '<td>' + (p.name || '') + '</td>' +
+          '<td>' + (p.exchange || '') + '</td>' +
+          '<td class="' + retCls + '">' + retVal + '</td>' +
+          '<td class="' + pctCls + '">' + retPct + '</td>';
+        closedTbody.appendChild(tr);
+      });
+      // Totals row
+      var totalRetPct = totalBought > 0 ? (totalReturn / totalBought * 100) : 0;
+      var totCls = retClass(totalReturn, totalRetPct);
+      var tfoot = document.createElement('tr');
+      tfoot.innerHTML =
+        '<td></td>' +
+        '<td><strong>TOTAL</strong></td>' +
+        '<td></td>' +
+        '<td></td>' +
+        '<td class="' + totCls + '"><strong>' + fmt(totalReturn, 'GBP') + '</strong></td>' +
+        '<td class="' + totCls + '"><strong>' + totalRetPct.toFixed(1) + '%</strong></td>';
+      closedTfoot.appendChild(tfoot);
+    }
+  }
+
   function render(msg) {
     lastPositions = msg.positions || [];
+    lastClosed = msg.closedPositions || [];
     renderPositions(lastPositions);
+    renderClosed(lastClosed);
 
     var ts = new Date(msg.timestamp);
     updatedEl.textContent = 'Last updated: ' + ts.toLocaleTimeString();
@@ -203,5 +339,6 @@
   }
 
   updateSortIndicators();
+  updateClosedSortIndicators();
   connect();
 })();

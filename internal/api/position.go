@@ -16,6 +16,14 @@ type Position struct {
 	Returns         *ReturnInfo `json:"returns,omitempty"`
 }
 
+// ClosedPosition represents a previously held instrument with realised returns.
+type ClosedPosition struct {
+	Ticker   string      `json:"ticker"`
+	Name     string      `json:"name"`
+	Exchange string      `json:"exchange"`
+	Returns  *ReturnInfo `json:"returns,omitempty"`
+}
+
 // CurrencySymbol returns the display symbol for the position's currency.
 func (p Position) CurrencySymbol() string {
 	switch p.Currency {

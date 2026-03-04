@@ -47,6 +47,35 @@ func TestStore_SetAll(t *testing.T) {
 	}
 }
 
+func TestStore_Tickers(t *testing.T) {
+	s := history.NewStore()
+	s.Set("AAPL_US_EQ", api.ReturnInfo{Return: 10.0})
+	s.Set("LLOY_EQ", api.ReturnInfo{Return: 5.0})
+	s.Set("TSLA_US_EQ", api.ReturnInfo{Return: -3.0})
+
+	tickers := s.Tickers()
+	if len(tickers) != 3 {
+		t.Fatalf("expected 3 tickers, got %d", len(tickers))
+	}
+	found := make(map[string]bool)
+	for _, t := range tickers {
+		found[t] = true
+	}
+	for _, want := range []string{"AAPL_US_EQ", "LLOY_EQ", "TSLA_US_EQ"} {
+		if !found[want] {
+			t.Errorf("missing ticker %q", want)
+		}
+	}
+}
+
+func TestStore_TickersEmpty(t *testing.T) {
+	s := history.NewStore()
+	tickers := s.Tickers()
+	if len(tickers) != 0 {
+		t.Errorf("expected 0 tickers, got %d", len(tickers))
+	}
+}
+
 func TestStore_ConcurrentAccess(t *testing.T) {
 	s := history.NewStore()
 	var wg sync.WaitGroup

@@ -304,6 +304,51 @@ func TestClient_FetchPositions_FallbackWithoutMetadata(t *testing.T) {
 	}
 }
 
+func TestClient_LookupInstrument(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v0/equity/metadata/instruments":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"ticker": "AAPL_US_EQ", "name": "Apple Inc", "currencyCode": "USD", "workingScheduleId": 10},
+				{"ticker": "LLOY_EQ", "name": "Lloyds Banking Group", "currencyCode": "GBX", "workingScheduleId": 20},
+			})
+		case "/api/v0/equity/metadata/exchanges":
+			json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 1, "name": "NYSE", "workingSchedules": []map[string]any{{"id": 10}}},
+				{"id": 2, "name": "London Stock Exchange", "workingSchedules": []map[string]any{{"id": 20}}},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	c := api.NewClient("k", "s", srv.URL, srv.Client())
+	if err := c.LoadMetadata(context.Background()); err != nil {
+		t.Fatalf("LoadMetadata: %v", err)
+	}
+
+	name, exchange := c.LookupInstrument("AAPL_US_EQ")
+	if name != "Apple Inc" {
+		t.Errorf("name: got %q, want Apple Inc", name)
+	}
+	if exchange != "NYSE" {
+		t.Errorf("exchange: got %q, want NYSE", exchange)
+	}
+
+	name, exchange = c.LookupInstrument("LLOY_EQ")
+	if name != "Lloyds Banking Group" {
+		t.Errorf("name: got %q, want Lloyds Banking Group", name)
+	}
+	if exchange != "LSE" {
+		t.Errorf("exchange: got %q, want LSE (abbreviated)", exchange)
+	}
+
+	// Unknown ticker
+	name, exchange = c.LookupInstrument("UNKNOWN_EQ")
+	if name != "" || exchange != "" {
+		t.Errorf("unknown ticker: got name=%q exchange=%q, want empty", name, exchange)
+	}
+}
+
 func TestClient_FetchOrderHistory(t *testing.T) {
 	page := 0
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
