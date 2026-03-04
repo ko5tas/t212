@@ -75,7 +75,8 @@ jobs:
           if ! curl -fsSL -o native-lib.tar.gz "${URL}" 2>/dev/null; then
             echo "Exact version not available, finding nearest aarch64 build..."
             FALLBACK_TAG=$(gh api repos/exquo/signal-libs-build/releases --paginate \
-              --jq '[.[] | select(.assets[]?.name | contains("aarch64-unknown-linux-gnu"))] | .[0].tag_name')
+              --jq '.[] | select(.assets[]?.name | contains("aarch64-unknown-linux-gnu")) | .tag_name' \
+              | head -1)
             FALLBACK_VERSION="${FALLBACK_TAG#libsignal_v}"
             echo "::warning::Using fallback libsignal native v${FALLBACK_VERSION} (wanted v${LIBSIGNAL_VERSION})"
             ASSET="libsignal_jni.so-v${FALLBACK_VERSION}-aarch64-unknown-linux-gnu.tar.gz"
