@@ -74,6 +74,7 @@ jobs:
 
       - name: Update APT repository
         run: |
+          mkdir -p gh-pages/apt/pool/main gh-pages/apt/dists/stable/main/binary-arm64
           cp t212_${{ github.ref_name }}_arm64.deb gh-pages/apt/pool/main/
 
           cd gh-pages/apt
