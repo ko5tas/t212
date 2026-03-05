@@ -16,16 +16,16 @@ Description: signal-cli repackaged for the t212 APT repository.
  Upstream: https://github.com/AsamK/signal-cli
 
 Package: t212
-Version: 1.6.2
+Version: 1.6.3
 Architecture: arm64
 Maintainer: t212 <noreply@github.com>
 Installed-Size: 10604
 Recommends: signal-cli
-Filename: pool/main/t212_1.6.2_arm64.deb
-Size: 5804662
-MD5sum: a3f289dd9fdc16aa47440fbf68234429
-SHA1: bd561a6f0e71d6752be1afdf88a2db18f97ea04b
-SHA256: 477b949075583346639421032ef3e6a7bcec8d32357c00755058936baf79f61d
+Filename: pool/main/t212_1.6.3_arm64.deb
+Size: 5804410
+MD5sum: 8e9f0b53cbf39c68f1dbffb884ff098f
+SHA1: f2d672d5fb2a5d62d74e453449621e46336aa420
+SHA256: 4af1f4a6c80a0e8afff2add827f28aa81aa68ba15cd27c1418ee4d64a0c57432
 Section: utils
 Priority: optional
 Homepage: https://github.com/ko5tas/t212
