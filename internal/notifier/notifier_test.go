@@ -31,7 +31,7 @@ func TestNotifier_NotifyEntered(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
 	n := notifier.New(binPath, "+306937278441", "+447700000000", "")
-	n.Notify("AAPL_US_EQ", "Apple Inc", true, 25.50)
+	n.Notify("AAPL_US_EQ", "Apple Inc", true, 25.50, 3.21)
 
 	data, err := os.ReadFile(argsFile)
 	if err != nil {
@@ -57,13 +57,16 @@ func TestNotifier_NotifyEntered(t *testing.T) {
 	if !strings.Contains(args, "+£25.50") {
 		t.Errorf("expected profit amount in message, got: %q", args)
 	}
+	if !strings.Contains(args, "+3.21%") {
+		t.Errorf("expected return pct in message, got: %q", args)
+	}
 }
 
 func TestNotifier_NotifyExited(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
 	n := notifier.New(binPath, "+306937278441", "+447700000000", "")
-	n.Notify("TSLA_US_EQ", "Tesla Inc", false, 50.00)
+	n.Notify("TSLA_US_EQ", "Tesla Inc", false, 50.00, -5.00)
 
 	data, _ := os.ReadFile(argsFile)
 	args := string(data)
@@ -74,11 +77,11 @@ func TestNotifier_NotifyExited(t *testing.T) {
 	if !strings.Contains(args, "Tesla Inc") {
 		t.Errorf("expected name in message, got: %q", args)
 	}
-	if !strings.Contains(args, "is down") {
-		t.Errorf("expected 'is down' in message, got: %q", args)
-	}
 	if !strings.Contains(args, "-£50.00") {
 		t.Errorf("expected loss amount in message, got: %q", args)
+	}
+	if !strings.Contains(args, "-5.00%") {
+		t.Errorf("expected return pct in message, got: %q", args)
 	}
 }
 
@@ -86,7 +89,7 @@ func TestNotifier_ConfigPathPassed(t *testing.T) {
 	binPath, argsFile := fakeSignalCLI(t)
 
 	n := notifier.New(binPath, "+306937278441", "+447700000000", "/var/lib/t212/signal-cli")
-	n.Notify("AAPL_US_EQ", "Apple Inc", true, 5.00)
+	n.Notify("AAPL_US_EQ", "Apple Inc", true, 5.00, 2.50)
 
 	data, err := os.ReadFile(argsFile)
 	if err != nil {
@@ -102,12 +105,12 @@ func TestNotifier_ConfigPathPassed(t *testing.T) {
 func TestNotifier_SignalCLINotFound(t *testing.T) {
 	n := notifier.New("/nonexistent/signal-cli", "+306937278441", "+447700000000", "")
 	// Must not panic — just log the error.
-	n.Notify("AAPL_US_EQ", "Apple Inc", true, 9.30)
+	n.Notify("AAPL_US_EQ", "Apple Inc", true, 9.30, 1.50)
 }
 
 func TestNotifier_ImplementsPollerNotifier(t *testing.T) {
 	// Compile-time interface satisfaction check.
 	var _ interface {
-		Notify(ticker, name string, entered bool, profit float64)
+		Notify(ticker, name string, entered bool, amount, returnPct float64)
 	} = (*notifier.Notifier)(nil)
 }

@@ -183,7 +183,7 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 		if pos.CurrentValueGBP > pos.Returns.TotalBought+p.threshold {
 			nowAbove[pos.Ticker] = pos
 		}
-		if pos.Returns.TotalBought > 0 && pos.CurrentValueGBP < pos.Returns.TotalBought*0.90 {
+		if pos.Returns.TotalBought > 0 && pos.CurrentValueGBP < pos.Returns.TotalBought {
 			nowBelow[pos.Ticker] = pos
 		}
 	}
@@ -195,15 +195,17 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 	for ticker, pos := range nowAbove {
 		if !p.prevAbove[ticker] {
 			profit := pos.CurrentValueGBP - pos.Returns.TotalBought
-			p.notifier.Notify(ticker, pos.Name, true, profit)
+			pct := profit / pos.Returns.TotalBought * 100
+			p.notifier.Notify(ticker, pos.Name, true, profit, pct)
 		}
 	}
 
-	// Detect edge: dropped 10% below total bought.
+	// Detect edge: return went negative.
 	for ticker, pos := range nowBelow {
 		if !p.prevBelow[ticker] {
 			loss := pos.Returns.TotalBought - pos.CurrentValueGBP
-			p.notifier.Notify(ticker, pos.Name, false, loss)
+			pct := (pos.CurrentValueGBP - pos.Returns.TotalBought) / pos.Returns.TotalBought * 100
+			p.notifier.Notify(ticker, pos.Name, false, loss, pct)
 		}
 	}
 

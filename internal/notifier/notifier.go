@@ -21,16 +21,16 @@ func New(signalCLIPath, sender, recipient, configPath string) *Notifier {
 	return &Notifier{signalCLIPath: signalCLIPath, sender: sender, recipient: recipient, configPath: configPath}
 }
 
-// Notify sends a Signal message when a position enters or exits the profit threshold.
-// entered=true means the position just crossed above the threshold.
-// entered=false means it just dropped below.
-// profit is the total GBP profit (currentValueGBP - totalBought).
-func (n *Notifier) Notify(ticker, name string, entered bool, amount float64) {
+// Notify sends a Signal message when a position crosses a notification boundary.
+// entered=true means the position crossed above the profit threshold.
+// entered=false means the return went negative.
+// amount is the absolute GBP difference, returnPct is the signed return percentage.
+func (n *Notifier) Notify(ticker, name string, entered bool, amount, returnPct float64) {
 	var msg string
 	if entered {
-		msg = fmt.Sprintf("🟢 %s (%s) is now +£%.2f profit!", name, ticker, amount)
+		msg = fmt.Sprintf("✅▲ %s (%s) +£%.2f (+%.2f%%)", name, ticker, amount, returnPct)
 	} else {
-		msg = fmt.Sprintf("🔴 %s (%s) is down -£%.2f (10%% loss)", name, ticker, amount)
+		msg = fmt.Sprintf("🟥▼ %s (%s) -£%.2f (%.2f%%)", name, ticker, amount, returnPct)
 	}
 
 	args := []string{}

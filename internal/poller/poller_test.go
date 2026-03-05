@@ -148,16 +148,17 @@ type mockNotifier struct {
 }
 
 type notifyCall struct {
-	ticker  string
-	name    string
-	entered bool
-	profit  float64
+	ticker    string
+	name      string
+	entered   bool
+	profit    float64
+	returnPct float64
 }
 
-func (m *mockNotifier) Notify(ticker, name string, entered bool, profit float64) {
+func (m *mockNotifier) Notify(ticker, name string, entered bool, profit, returnPct float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.calls = append(m.calls, notifyCall{ticker, name, entered, profit})
+	m.calls = append(m.calls, notifyCall{ticker, name, entered, profit, returnPct})
 }
 
 func (m *mockNotifier) Calls() []notifyCall {
@@ -201,7 +202,7 @@ var (
 	posNeutral = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 100.50, CurrentValueGBP: 100.50}}
 	// currentValueGBP 110.00, totalBought 100.00 → profit 10.00 > 1.00 (green)
 	posAbove = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 110.00, CurrentValueGBP: 110.00}}
-	// currentValueGBP 89.00, totalBought 100.00 → 11% loss (red)
+	// currentValueGBP 89.00, totalBought 100.00 → negative return (red)
 	posLoss = []api.Position{{Ticker: "AAPL_US_EQ", Currency: "USD", Quantity: 1, AveragePrice: 100.00, CurrentPrice: 89.00, CurrentValueGBP: 89.00}}
 )
 
@@ -248,8 +249,8 @@ func TestSendNotifications_EnterThreshold(t *testing.T) {
 }
 
 func TestSendNotifications_LossThreshold(t *testing.T) {
-	// Sequence: poll(neutral), bg-poll(neutral), tick-poll(loss 11%).
-	// Expected: 1 red notification for 10% loss.
+	// Sequence: poll(neutral), bg-poll(neutral), tick-poll(loss).
+	// Expected: 1 red notification for negative return.
 	srv := makeSequenceServer(t, [][]api.Position{posNeutral, posNeutral, posLoss})
 	defer srv.Close()
 
@@ -366,7 +367,7 @@ func TestPoller_BroadcastIncludesReturns(t *testing.T) {
 
 func TestSendNotifications_ProfitToNeutralNoRedAlert(t *testing.T) {
 	// Sequence: poll(above), bg-poll(above), tick-poll(neutral).
-	// Dropping from profit to neutral should NOT trigger a red alert (not a 10% loss).
+	// Dropping from profit to neutral should NOT trigger a red alert (return still positive).
 	srv := makeSequenceServer(t, [][]api.Position{posAbove, posAbove, posNeutral})
 	defer srv.Close()
 

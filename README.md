@@ -165,8 +165,8 @@ Two independent edge-triggered alerts:
 
 | Alert | Condition | Message |
 |---|---|---|
-| Profit | `currentValueGBP > totalBought + £1` | `🟢 Apple Inc (AAPL_US_EQ) is now +£25.50 profit!` |
-| Loss | `currentValueGBP < totalBought × 0.90` | `🔴 Tesla Inc (TSLA_US_EQ) is down -£12.30 (10% loss)` |
+| Profit | `currentValueGBP > totalBought + £1` | `✅▲ Apple Inc (AAPL_US_EQ) +£25.50 (+3.21%)` |
+| Loss | `currentValueGBP < totalBought` (negative return) | `🟥▼ Tesla Inc (TSLA_US_EQ) -£12.30 (-1.54%)` |
 
 Alerts are **edge-triggered**: you receive one message when a position crosses the boundary, not one per poll while it stays there. Each alert fires independently — a position can trigger both if it first profits and later drops.
 
