@@ -20,42 +20,57 @@ case "$1" in
         mkdir -p /var/lib/t212/signal-cli
         chown t212:t212 /var/lib/t212/signal-cli
 
-        # Register and enable the service (does NOT start it)
+        # Register and enable the service
         if [ -d /run/systemd/system ]; then
             systemctl daemon-reload
             systemctl enable t212
         fi
 
-        echo ""
-        echo "================================================================"
-        echo " t212 installed successfully."
-        echo "================================================================"
-        echo ""
-        echo " Next steps:"
-        echo ""
-        echo "  1. Edit the config file and set your credentials:"
-        echo "       sudo nano /etc/t212/config.env"
-        echo ""
-        echo "     Required:"
-        echo "       T212_API_KEY=<API key ID shown when you generated the key>"
-        echo "       T212_API_SECRET=<API secret key shown once at generation time>"
-        echo ""
-        echo "     Optional:"
-        echo "       SIGNAL_NUMBER=+447700000000   (Signal notifications)"
-        echo "       T212_PORT=8080                (web UI port, default: 8080)"
-        echo ""
-        echo "  2. Start the service:"
-        echo "       sudo systemctl start t212"
-        echo ""
-        echo "  3. Check it is running:"
-        echo "       sudo systemctl status t212"
-        echo "       sudo journalctl -u t212 -f"
-        echo ""
-        echo "  4. Open the web UI in a browser:"
-        echo "       http://localhost:8080        (from this machine)"
-        echo "       http://<this-host-ip>:8080   (from another device on the LAN)"
-        echo ""
-        echo "================================================================"
-        echo ""
+        # $2 is the previously installed version; non-empty means upgrade
+        if [ -n "$2" ]; then
+            # Upgrade: restart the service
+            if [ -d /run/systemd/system ]; then
+                systemctl restart t212 || true
+            fi
+            echo ""
+            echo "================================================================"
+            echo " t212 upgraded to $(dpkg-query -W -f='${Version}' t212 2>/dev/null || echo 'latest')."
+            echo " Service restarted."
+            echo "================================================================"
+            echo ""
+        else
+            # Fresh install: print setup instructions
+            echo ""
+            echo "================================================================"
+            echo " t212 installed successfully."
+            echo "================================================================"
+            echo ""
+            echo " Next steps:"
+            echo ""
+            echo "  1. Edit the config file and set your credentials:"
+            echo "       sudo nano /etc/t212/config.env"
+            echo ""
+            echo "     Required:"
+            echo "       T212_API_KEY=<API key ID shown when you generated the key>"
+            echo "       T212_API_SECRET=<API secret key shown once at generation time>"
+            echo ""
+            echo "     Optional:"
+            echo "       SIGNAL_NUMBER=+447700000000   (Signal notifications)"
+            echo "       T212_PORT=8080                (web UI port, default: 8080)"
+            echo ""
+            echo "  2. Start the service:"
+            echo "       sudo systemctl start t212"
+            echo ""
+            echo "  3. Check it is running:"
+            echo "       sudo systemctl status t212"
+            echo "       sudo journalctl -u t212 -f"
+            echo ""
+            echo "  4. Open the web UI in a browser:"
+            echo "       http://localhost:8080        (from this machine)"
+            echo "       http://<this-host-ip>:8080   (from another device on the LAN)"
+            echo ""
+            echo "================================================================"
+            echo ""
+        fi
         ;;
 esac
