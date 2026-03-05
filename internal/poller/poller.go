@@ -174,17 +174,28 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 		return
 	}
 
-	nowAbove := make(map[string]api.Position)
-	nowBelow := make(map[string]api.Position)
+	type liveReturn struct {
+		pos    api.Position
+		ret    float64 // live return: currentValueGBP + totalSold + totalDividends - totalBought
+		retPct float64
+	}
+
+	nowAbove := make(map[string]liveReturn)
+	nowBelow := make(map[string]liveReturn)
 	for _, pos := range positions {
-		if pos.Returns == nil {
+		if pos.Returns == nil || pos.Returns.TotalBought == 0 {
 			continue
 		}
-		if pos.CurrentValueGBP > pos.Returns.TotalBought+p.threshold {
-			nowAbove[pos.Ticker] = pos
+		r := pos.Returns
+		ret := pos.CurrentValueGBP + r.TotalSold + r.TotalDividends - r.TotalBought
+		retPct := ret / r.TotalBought * 100
+		lr := liveReturn{pos: pos, ret: ret, retPct: retPct}
+
+		if ret > p.threshold {
+			nowAbove[pos.Ticker] = lr
 		}
-		if pos.Returns.TotalBought > 0 && pos.CurrentValueGBP < pos.Returns.TotalBought {
-			nowBelow[pos.Ticker] = pos
+		if ret < 0 {
+			nowBelow[pos.Ticker] = lr
 		}
 	}
 
@@ -192,20 +203,16 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 	defer p.mu.Unlock()
 
 	// Detect edge: crossed above profit threshold.
-	for ticker, pos := range nowAbove {
+	for ticker, lr := range nowAbove {
 		if !p.prevAbove[ticker] {
-			profit := pos.CurrentValueGBP - pos.Returns.TotalBought
-			pct := profit / pos.Returns.TotalBought * 100
-			p.notifier.Notify(ticker, pos.Name, true, profit, pct)
+			p.notifier.Notify(ticker, lr.pos.Name, true, lr.ret, lr.retPct)
 		}
 	}
 
 	// Detect edge: return went negative.
-	for ticker, pos := range nowBelow {
+	for ticker, lr := range nowBelow {
 		if !p.prevBelow[ticker] {
-			loss := pos.Returns.TotalBought - pos.CurrentValueGBP
-			pct := (pos.CurrentValueGBP - pos.Returns.TotalBought) / pos.Returns.TotalBought * 100
-			p.notifier.Notify(ticker, pos.Name, false, loss, pct)
+			p.notifier.Notify(ticker, lr.pos.Name, false, -lr.ret, lr.retPct)
 		}
 	}
 
