@@ -20,6 +20,28 @@
   var closedSortAsc = false;
   var activeTab = 'active';
 
+  // Favicon blink: toggle between normal and green when positions are blinking.
+  var faviconEl = document.querySelector('link[rel="icon"]');
+  var faviconNormal = '/favicon.svg';
+  var faviconGreen = '/favicon-green.svg';
+  var faviconTimer = null;
+  var faviconState = false;
+
+  function updateFaviconBlink() {
+    var hasProfit = !!tbodyEl.querySelector('.profit-blink');
+    if (hasProfit && !faviconTimer) {
+      faviconTimer = setInterval(function () {
+        faviconState = !faviconState;
+        faviconEl.href = faviconState ? faviconGreen : faviconNormal;
+      }, 1000);
+    } else if (!hasProfit && faviconTimer) {
+      clearInterval(faviconTimer);
+      faviconTimer = null;
+      faviconState = false;
+      faviconEl.href = faviconNormal;
+    }
+  }
+
   function sendRefresh(ticker) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ action: 'refresh', ticker: ticker }));
@@ -307,6 +329,7 @@
     lastClosed = msg.closedPositions || [];
     renderPositions(lastPositions);
     renderClosed(lastClosed);
+    updateFaviconBlink();
 
     var ts = new Date(msg.timestamp);
     updatedEl.textContent = 'Last updated: ' + ts.toLocaleTimeString();
