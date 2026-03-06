@@ -176,7 +176,7 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 
 	type liveReturn struct {
 		pos    api.Position
-		ret    float64 // live return: currentValueGBP + totalSold + totalDividends - totalBought
+		ret    float64 // amount for notification message
 		retPct float64
 	}
 
@@ -187,15 +187,25 @@ func (p *Poller) sendNotifications(positions []api.Position) {
 			continue
 		}
 		r := pos.Returns
-		ret := pos.CurrentValueGBP + r.TotalSold + r.TotalDividends - r.TotalBought
-		retPct := ret / r.TotalBought * 100
-		lr := liveReturn{pos: pos, ret: ret, retPct: retPct}
 
-		if ret > p.threshold {
-			nowAbove[pos.Ticker] = lr
+		// Profit: unrealised gain on current holding (matches blink rule).
+		mvProfit := pos.CurrentValueGBP - r.TotalBought
+		if mvProfit > p.threshold {
+			nowAbove[pos.Ticker] = liveReturn{
+				pos:    pos,
+				ret:    mvProfit,
+				retPct: mvProfit / r.TotalBought * 100,
+			}
 		}
+
+		// Loss: total return including sold + dividends.
+		ret := pos.CurrentValueGBP + r.TotalSold + r.TotalDividends - r.TotalBought
 		if ret < 0 {
-			nowBelow[pos.Ticker] = lr
+			nowBelow[pos.Ticker] = liveReturn{
+				pos:    pos,
+				ret:    ret,
+				retPct: ret / r.TotalBought * 100,
+			}
 		}
 	}
 
