@@ -1,7 +1,6 @@
 package history
 
 import (
-	"log/slog"
 	"strings"
 
 	"github.com/ko5tas/t212/internal/api"
@@ -15,7 +14,7 @@ import (
 //
 // Return = currentValueGBP + sold + dividends − bought.
 // ReturnPct = Return / bought × 100.
-func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, currentValueGBP float64) api.ReturnInfo {
+func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, currentValueGBP float64, fallbackBought ...float64) api.ReturnInfo {
 	var bought, sold float64
 
 	for _, o := range orders {
@@ -37,6 +36,11 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 		}
 	}
 
+	// If no filled buy orders found, use fallback cost basis from position data.
+	if bought == 0 && len(fallbackBought) > 0 && fallbackBought[0] > 0 {
+		bought = fallbackBought[0]
+	}
+
 	var dividends float64
 	for _, d := range divs {
 		dividends += d.Amount
@@ -46,8 +50,6 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 	var retPct float64
 	if bought > 0 {
 		retPct = ret / bought * 100
-	} else if currentValueGBP > 0 {
-		slog.Warn("position has holdings but no buy orders found", "currentValueGBP", currentValueGBP, "orders", len(orders), "divs", len(divs))
 	}
 
 	return api.ReturnInfo{

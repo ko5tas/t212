@@ -301,29 +301,49 @@ func (p *Poller) refreshHistory(ctx context.Context, ticker string) {
 		for t := range divsByTicker {
 			tickers[t] = true
 		}
-		// Log which active positions have no orders in history
-		for _, pos := range positions {
-			if _, ok := ordersByTicker[pos.Ticker]; !ok {
-				slog.Warn("active position has no orders in history", "ticker", pos.Ticker, "currentValueGBP", pos.CurrentValueGBP)
-			}
-		}
 		for t := range tickers {
-			valGBP := findCurrentValueGBP(positions, t)
-			all[t] = history.ComputeReturns(ordersByTicker[t], divsByTicker[t], valGBP)
+			pos := findPosition(positions, t)
+			valGBP := float64(0)
+			if pos != nil {
+				valGBP = pos.CurrentValueGBP
+			}
+			all[t] = history.ComputeReturns(ordersByTicker[t], divsByTicker[t], valGBP, estimateBoughtGBP(pos))
 		}
 		p.historyStore.SetAll(all)
 	} else {
-		valGBP := findCurrentValueGBP(positions, ticker)
-		ri := history.ComputeReturns(orders, divs, valGBP)
+		pos := findPosition(positions, ticker)
+		valGBP := float64(0)
+		if pos != nil {
+			valGBP = pos.CurrentValueGBP
+		}
+		ri := history.ComputeReturns(orders, divs, valGBP, estimateBoughtGBP(pos))
 		p.historyStore.Set(ticker, ri)
 	}
 }
 
-func findCurrentValueGBP(positions []api.Position, ticker string) float64 {
-	for _, p := range positions {
-		if p.Ticker == ticker {
-			return p.CurrentValueGBP
+func findPosition(positions []api.Position, ticker string) *api.Position {
+	for i := range positions {
+		if positions[i].Ticker == ticker {
+			return &positions[i]
 		}
 	}
+	return nil
+}
+
+func findCurrentValueGBP(positions []api.Position, ticker string) float64 {
+	if p := findPosition(positions, ticker); p != nil {
+		return p.CurrentValueGBP
+	}
 	return 0
+}
+
+// estimateBoughtGBP derives a GBP cost basis from position data when order
+// history has no filled buy orders (e.g. AutoInvest/Pie acquisitions).
+// Formula: (averagePrice / currentPrice) * currentValueGBP
+// This works because the FX conversion ratio is the same for both prices.
+func estimateBoughtGBP(pos *api.Position) float64 {
+	if pos == nil || pos.CurrentPrice == 0 {
+		return 0
+	}
+	return (pos.AveragePrice / pos.CurrentPrice) * pos.CurrentValueGBP
 }
