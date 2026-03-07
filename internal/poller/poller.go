@@ -301,20 +301,21 @@ func (p *Poller) refreshHistory(ctx context.Context, ticker string) {
 		for t := range divsByTicker {
 			tickers[t] = true
 		}
-		// Log which active positions have no orders in history
-		for _, pos := range positions {
-			if _, ok := ordersByTicker[pos.Ticker]; !ok {
-				slog.Warn("active position has no orders in history", "ticker", pos.Ticker, "currentValueGBP", pos.CurrentValueGBP)
-			}
-		}
-		for t := range tickers {
+for t := range tickers {
 			valGBP := findCurrentValueGBP(positions, t)
-			all[t] = history.ComputeReturns(ordersByTicker[t], divsByTicker[t], valGBP)
+			ri := history.ComputeReturns(ordersByTicker[t], divsByTicker[t], valGBP)
+			if ri.TotalBought == 0 && valGBP > 0 {
+				continue // no filled buy orders; don't store misleading return data
+			}
+			all[t] = ri
 		}
 		p.historyStore.SetAll(all)
 	} else {
 		valGBP := findCurrentValueGBP(positions, ticker)
 		ri := history.ComputeReturns(orders, divs, valGBP)
+		if ri.TotalBought == 0 && valGBP > 0 {
+			return // no filled buy orders; don't store misleading return data
+		}
 		p.historyStore.Set(ticker, ri)
 	}
 }

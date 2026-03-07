@@ -18,13 +18,8 @@ import (
 func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, currentValueGBP float64) api.ReturnInfo {
 	var bought, sold float64
 
-	var skipped int
 	for _, o := range orders {
-		// Historical orders from T212 are all completed; filter on fill
-		// quantity to skip any non-trade entries.
 		if o.Fill.Quantity == 0 {
-			skipped++
-			slog.Warn("skipping zero-quantity order", "ticker", o.Order.Ticker, "side", o.Order.Side, "status", o.Order.Status, "netValue", o.Fill.Impact.NetValue, "price", o.Fill.Price)
 			continue
 		}
 		v := o.Fill.Impact.NetValue
@@ -52,7 +47,7 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 	if bought > 0 {
 		retPct = ret / bought * 100
 	} else if currentValueGBP > 0 {
-		slog.Warn("position has holdings but no buy orders found", "currentValueGBP", currentValueGBP, "orders", len(orders), "skippedZeroQty", skipped, "divs", len(divs))
+		slog.Warn("position has holdings but no buy orders found", "currentValueGBP", currentValueGBP, "orders", len(orders), "divs", len(divs))
 	}
 
 	return api.ReturnInfo{
