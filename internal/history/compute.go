@@ -34,6 +34,8 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 			bought += v
 		case "SELL":
 			sold += v
+		default:
+			slog.Warn("unknown order side", "side", o.Order.Side, "ticker", o.Order.Ticker, "quantity", o.Fill.Quantity, "netValue", o.Fill.Impact.NetValue)
 		}
 	}
 
