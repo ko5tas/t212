@@ -22,10 +22,10 @@ Maintainer: t212 <noreply@github.com>
 Installed-Size: 10981
 Recommends: signal-cli
 Filename: pool/main/t212_1.6.7_arm64.deb
-Size: 5982264
-MD5sum: 9c70493df3f70a8b47abff088d513138
-SHA1: 5bbced89d0d86e7684698846a382b8e1cd4a1ff5
-SHA256: 94a4661cca771b010ed0d8cc6496286d37cd9e8dca31872c6b6f287d7f4ab24f
+Size: 5982438
+MD5sum: f959c28ed36be5b77036e518d114f43e
+SHA1: 0398551feb03e0bd81ee34ed443065251992dd94
+SHA256: 54286bc476ae7294bb364bdc47366da4602053669cab7ea1b6388e90dd55f70a
 Section: utils
 Priority: optional
 Homepage: https://github.com/ko5tas/t212
