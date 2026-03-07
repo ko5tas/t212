@@ -1,6 +1,7 @@
 package history
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/ko5tas/t212/internal/api"
@@ -45,6 +46,8 @@ func ComputeReturns(orders []api.HistoricalOrder, divs []api.DividendItem, curre
 	var retPct float64
 	if bought > 0 {
 		retPct = ret / bought * 100
+	} else if currentValueGBP > 0 {
+		slog.Warn("position has holdings but no buy orders found", "currentValueGBP", currentValueGBP, "orders", len(orders), "divs", len(divs))
 	}
 
 	return api.ReturnInfo{

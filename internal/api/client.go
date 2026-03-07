@@ -372,13 +372,16 @@ func fetchHistoryPage[T any](c *Client, ctx context.Context, path string) ([]T, 
 	}
 	defer resp.Body.Close()
 
+	rl := parseRateLimit(resp)
+	slog.Debug("history page", "path", path, "status", resp.StatusCode, "ratelimit_remaining", rl.Remaining, "ratelimit_reset", rl.Reset)
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d", resp.StatusCode)
+		return nil, nil, RateLimitInfo{}, fmt.Errorf("unexpected status %d for %s", resp.StatusCode, path)
 	}
 
 	var page PaginatedResponse[T]
 	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
 		return nil, nil, RateLimitInfo{}, fmt.Errorf("decode: %w", err)
 	}
-	return page.Items, page.NextPagePath, parseRateLimit(resp), nil
+	return page.Items, page.NextPagePath, rl, nil
 }

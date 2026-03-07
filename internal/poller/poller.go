@@ -280,6 +280,8 @@ func (p *Poller) refreshHistory(ctx context.Context, ticker string) {
 		return
 	}
 
+	slog.Info("history fetched", "orders", len(orders), "dividends", len(divs))
+
 	positions := p.store.Get()
 
 	if ticker == "" {
@@ -298,6 +300,12 @@ func (p *Poller) refreshHistory(ctx context.Context, ticker string) {
 		}
 		for t := range divsByTicker {
 			tickers[t] = true
+		}
+		// Log which active positions have no orders in history
+		for _, pos := range positions {
+			if _, ok := ordersByTicker[pos.Ticker]; !ok {
+				slog.Warn("active position has no orders in history", "ticker", pos.Ticker, "currentValueGBP", pos.CurrentValueGBP)
+			}
 		}
 		for t := range tickers {
 			valGBP := findCurrentValueGBP(positions, t)
