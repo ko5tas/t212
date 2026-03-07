@@ -227,7 +227,7 @@
         }
         var ppsClass = p.profitPerShare >= 0 ? 'profit' : 'loss';
         var ppsSign = p.profitPerShare >= 0 ? '+' : '';
-        var mvCls = (r && (p.currentValueGBP || 0) > ((r.totalBought || 0) + 1)) ? 'profit-blink' : '';
+        var mvCls = (r && r.totalBought > 0 && (p.currentValueGBP || 0) > (r.totalBought + 1)) ? 'profit-blink' : '';
         var tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + (idx + 1) + '</td>' +
